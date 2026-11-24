@@ -1,3 +1,0 @@
-scene_id,scene_type,speaker,text,sms_sender,sms_time,sms_body,choice1_label,choice1_next,choice1_score,choice2_label,choice2_next,choice2_score,choice3_label,choice3_next,choice3_score,next_scene_id,tip_title,tip_body
-ep14_01,narration,案内役,【第14話：二人の未来という罠（ダミー）】数ヶ月交流した海外駐在員を名乗る相手から「二人の将来の荷物にかかる税関手数料を立て替えて」と懇願される。,,,,,,,,,,,,,ep14_end,,
-ep14_end,result,案内役,第14話の本編シナリオは現在準備中です。担当の方はこのファイル（data/scenarios/14.csv）を編集して物語を追加できます。,,,,,,,,,,,,,,このお話で身につく行動ルール,会ったことのない相手から金銭要求が出た瞬間に立ち止まり、送金せず周囲や窓口に相談する。

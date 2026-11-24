@@ -167,6 +167,41 @@ export function evaluateClueLevel(discoveredCount, totalClues) {
 }
 
 /**
+ * Resolve a scene's image field relative to the episode's scenario folder.
+ * @param {string} scenarioDir
+ * @param {string} imageField
+ * @returns {string}
+ */
+export function resolveSceneImage(scenarioDir, imageField) {
+  const raw = (imageField || '').trim();
+  if (!raw) return '';
+  if (/^(https?:\/\/|\/|\.\/|data:)/i.test(raw)) {
+    return raw;
+  }
+  const base = scenarioDir.endsWith('/') ? scenarioDir : `${scenarioDir}/`;
+  return `${base}${raw}`;
+}
+
+/**
+ * Create a responsive scene illustration figure that hides cleanly if missing.
+ * @param {string} imageUrl
+ * @param {string} altText
+ * @returns {HTMLElement}
+ */
+function createSceneImageFigure(imageUrl, altText) {
+  const figure = el('figure', 'novel-scene-figure');
+  const img = document.createElement('img');
+  img.className = 'novel-scene-img';
+  img.src = imageUrl;
+  img.alt = altText || '場面のイラスト';
+  img.addEventListener('error', () => {
+    figure.hidden = true;
+  });
+  figure.appendChild(img);
+  return figure;
+}
+
+/**
  * Helper to create a DOM element safely with textContent and classes.
  */
 function el(tag, className = '', text = '') {
@@ -207,6 +242,8 @@ export class NovelEngine {
 
     try {
       const cleanPath = (episode.scenario_file || '').trim().replace(/^\.?\//, '');
+      const lastSlash = cleanPath.lastIndexOf('/');
+      const scenarioDir = lastSlash >= 0 ? `./${cleanPath.slice(0, lastSlash + 1)}` : './';
       const scenes = await loadCSV(`./${cleanPath}`);
       if (!scenes.length) {
         throw new Error('シナリオデータが空です。');
@@ -221,6 +258,7 @@ export class NovelEngine {
           ...rawScene,
           scene_id: (rawScene.scene_id || '').trim(),
           scene_type: (rawScene.scene_type || 'narration').trim(),
+          image: (rawScene.image || '').trim(),
           next_scene_id: (rawScene.next_scene_id || '').trim(),
           choice1_next: (rawScene.choice1_next || '').trim(),
           choice2_next: (rawScene.choice2_next || '').trim(),
@@ -241,6 +279,7 @@ export class NovelEngine {
 
       this.state = {
         episode,
+        scenarioDir,
         scenes,
         sceneMap,
         sceneOrder,
@@ -303,13 +342,18 @@ export class NovelEngine {
     goalBox.appendChild(el('p', 'panel-body', episode.learning_goal));
     card.appendChild(goalBox);
 
+    const cleanScenarioFile = (episode.scenario_file || '').trim();
+    const folderPath = cleanScenarioFile.includes('/')
+      ? cleanScenarioFile.slice(0, cleanScenarioFile.lastIndexOf('/') + 1)
+      : 'data/scenarios/';
+
     const noticeBox = el('div', 'info-panel info-panel-amber');
     noticeBox.appendChild(el('h3', 'panel-heading', '制作・編集担当者の方へ'));
     noticeBox.appendChild(
       el(
         'p',
         'panel-body',
-        `第2話以降は順次作成中です。担当者は「${episode.scenario_file}」を編集し、「data/episodes.csv」の status を playable に変更すると本編として公開できます。`
+        `第2話以降は順次作成中です。担当者は「${cleanScenarioFile}」を編集し、同じフォルダ（${folderPath}）にイラスト画像を入れて「data/episodes.csv」の status を playable に変更すると本編として公開できます。`
       )
     );
     card.appendChild(noticeBox);
@@ -429,6 +473,17 @@ export class NovelEngine {
     }
 
     const stage = el('section', 'card novel-stage');
+
+    // Scene illustration (from the episode's own folder)
+    const sceneImageUrl = resolveSceneImage(this.state.scenarioDir, scene.image);
+    if (sceneImageUrl) {
+      stage.appendChild(
+        createSceneImageFigure(
+          sceneImageUrl,
+          `第${episode.episode_id}話「${episode.episode_title}」の場面イラスト`
+        )
+      );
+    }
 
     // Speaker badge
     const speaker = (scene.speaker || '').trim();
@@ -628,6 +683,17 @@ export class NovelEngine {
     card.appendChild(verdictBanner);
 
     card.appendChild(el('h2', 'result-title', `第${episode.episode_id}話「${episode.episode_title}」結果`));
+
+    const resultImageUrl = resolveSceneImage(this.state.scenarioDir, scene.image);
+    if (resultImageUrl) {
+      card.appendChild(
+        createSceneImageFigure(
+          resultImageUrl,
+          `第${episode.episode_id}話「${episode.episode_title}」の結果イラスト`
+        )
+      );
+    }
+
     card.appendChild(el('p', 'novel-text', scene.text));
 
     // Separate psychological safety declaration so red danger warning never implies real harm happened

@@ -1,0 +1,3 @@
+scene_id,scene_type,speaker,text,image,sms_sender,sms_time,sms_body,choice1_label,choice1_next,choice1_score,choice2_label,choice2_next,choice2_score,choice3_label,choice3_next,choice3_score,next_scene_id,tip_title,tip_body
+ep6_01,narration,案内役,【第6話：孫からの緊急メッセージ（ダミー）】孫を名乗るアカウントから「携帯が水没して壊れた。急ぎでお金を立て替えてほしい」とメッセージが届く。,,,,,,,,,,,,,,ep6_end,,
+ep6_end,result,案内役,第6話の本編シナリオは現在準備中です。担当の方はこのファイル（data/scenarios/06/scenario.csv）を編集して物語を追加できます。,,,,,,,,,,,,,,,このお話で身につく行動ルール,指示には従わず、家族で決めた合言葉や、孫本人・親の従来の電話番号へ直接電話して確認をとる。

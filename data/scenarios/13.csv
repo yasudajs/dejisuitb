@@ -1,3 +1,0 @@
-scene_id,scene_type,speaker,text,sms_sender,sms_time,sms_body,choice1_label,choice1_next,choice1_score,choice2_label,choice2_next,choice2_score,choice3_label,choice3_next,choice3_score,next_scene_id,tip_title,tip_body
-ep13_01,narration,案内役,【第13話：画面の警告と救世主（ダミー）】警告画面の番号に電話すると親切な自称セキュリティ担当者が遠隔操作を提案し、コンビニで電子マネー購入を指示してくる。,,,,,,,,,,,,,ep13_end,,
-ep13_end,result,案内役,第13話の本編シナリオは現在準備中です。担当の方はこのファイル（data/scenarios/13.csv）を編集して物語を追加できます。,,,,,,,,,,,,,,このお話で身につく行動ルール,正規のサポート企業がコンビニの電子マネーで修理代金を請求することは絶対にないため、すぐに電話を切る。

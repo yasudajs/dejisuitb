@@ -1,3 +1,0 @@
-scene_id,scene_type,speaker,text,sms_sender,sms_time,sms_body,choice1_label,choice1_next,choice1_score,choice2_label,choice2_next,choice2_score,choice3_label,choice3_next,choice3_score,next_scene_id,tip_title,tip_body
-ep12_01,narration,案内役,【第12話：選ばれた私だけの特別枠（ダミー）】著名人広告から誘導されたアドバイザーに「あなただけの非公開特別枠」と優越感をくすぐられ、今日中の送金を急かされる。,,,,,,,,,,,,,ep12_end,,
-ep12_end,result,案内役,第12話の本編シナリオは現在準備中です。担当の方はこのファイル（data/scenarios/12.csv）を編集して物語を追加できます。,,,,,,,,,,,,,,このお話で身につく行動ルール,「自分だけが特別扱いされる投資話は100%詐欺である」という原則を思い出し、送金を中止する。
