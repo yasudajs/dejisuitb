@@ -42,6 +42,111 @@ export function parseClueTokens(rawText, startIndex = 0) {
 }
 
 /**
+ * Compute the maximum achievable actionScore from the starting scene to any result scene.
+ * Uses cycle-safe DFS so contributors editing scenario CSVs do not break calculation.
+ * @param {Array<Record<string, string>>} scenes
+ * @returns {number}
+ */
+export function computeMaxActionScore(scenes) {
+  if (!Array.isArray(scenes) || scenes.length === 0) return 0;
+
+  const sceneMap = new Map();
+  scenes.forEach((raw) => {
+    const id = (raw.scene_id || '').trim();
+    if (!id) return;
+    sceneMap.set(id, {
+      ...raw,
+      scene_id: id,
+      scene_type: (raw.scene_type || 'narration').trim(),
+      next_scene_id: (raw.next_scene_id || '').trim(),
+      choice1_next: (raw.choice1_next || '').trim(),
+      choice2_next: (raw.choice2_next || '').trim(),
+      choice3_next: (raw.choice3_next || '').trim(),
+    });
+  });
+
+  const startId = (scenes[0].scene_id || '').trim();
+  if (!startId || !sceneMap.has(startId)) return 0;
+
+  function dfs(sceneId, visited) {
+    if (!sceneId || visited.has(sceneId) || !sceneMap.has(sceneId)) {
+      return 0;
+    }
+    const scene = sceneMap.get(sceneId);
+    if (scene.scene_type === 'result') {
+      return 0;
+    }
+
+    const nextVisited = new Set(visited);
+    nextVisited.add(sceneId);
+
+    if (scene.scene_type === 'choice') {
+      let best = 0;
+      let hasChoice = false;
+      for (let i = 1; i <= 3; i++) {
+        const nextId = scene[`choice${i}_next`];
+        if (!nextId) continue;
+        hasChoice = true;
+        const score = Number.parseInt(scene[`choice${i}_score`] || '0', 10) || 0;
+        const branchTotal = score + dfs(nextId, nextVisited);
+        if (branchTotal > best) {
+          best = branchTotal;
+        }
+      }
+      return hasChoice ? best : 0;
+    }
+
+    if (scene.next_scene_id) {
+      return dfs(scene.next_scene_id, nextVisited);
+    }
+    return 0;
+  }
+
+  return dfs(startId, new Set());
+}
+
+/**
+ * Evaluate result level ('good' | 'caution' | 'bad' | 'neutral') from actionScore / maxActionScore.
+ * @param {number} actionScore
+ * @param {number} maxActionScore
+ * @returns {{ level: 'good'|'caution'|'bad'|'neutral', badge: string, summary: string }}
+ */
+export function evaluateResultLevel(actionScore, maxActionScore) {
+  if (!maxActionScore || maxActionScore <= 0) {
+    return {
+      level: 'neutral',
+      badge: '📖 確認おわり',
+      summary:
+        'ダミー画面のプレビューが完了しました。本編が完成すると安全行動スコアに応じた良い・危険の判定もここに表示されます。',
+    };
+  }
+
+  const ratio = actionScore / maxActionScore;
+  if (ratio >= 0.75) {
+    return {
+      level: 'good',
+      badge: '✅ 良い結果：安全な行動ができました！',
+      summary:
+        'すばらしい判断です！怪しい連絡に慌てず、被害を防ぐ安全な行動がしっかり選べています。',
+    };
+  }
+  if (ratio >= 0.35) {
+    return {
+      level: 'caution',
+      badge: '⚠️ もう一歩：途中で危険に気づけました',
+      summary:
+        '途中まではヒヤッとしましたが、大事なところで立ち止まれました。次は最初のメッセージの時点で見抜いてみましょう！',
+    };
+  }
+  return {
+    level: 'bad',
+    badge: '🚨 危険な結果：本番なら被害にあっていた行動です',
+    summary:
+      '偽サイトへ大切な情報を入力してしまうと、お金や個人情報を盗まれる大変危険な行動でした。どこで引き返せたか、下のポイントを一緒に確認しましょう！',
+  };
+}
+
+/**
  * Helper to create a DOM element safely with textContent and classes.
  */
 function el(tag, className = '', text = '') {
@@ -112,6 +217,8 @@ export class NovelEngine {
         }
       });
 
+      const maxActionScore = computeMaxActionScore(scenes);
+
       this.state = {
         episode,
         scenes,
@@ -120,6 +227,7 @@ export class NovelEngine {
         currentSceneId: scenes[0].scene_id.trim(),
         history: [],
         actionScore: 0,
+        maxActionScore,
         discoveredClues: new Set(),
         totalClues,
         activeClueFeedback: null,
@@ -486,23 +594,29 @@ export class NovelEngine {
   }
 
   /**
-   * Render affirming completion summary, score, learning tip, and official helplines.
+   * Render color-coded completion summary, score, learning tip, and official helplines.
    */
   renderResultScene(scene) {
-    const { episode, discoveredClues, totalClues, actionScore } = this.state;
-    const card = el('section', 'card novel-result-card');
+    const { episode, discoveredClues, totalClues, actionScore, maxActionScore } = this.state;
+    const evalResult = evaluateResultLevel(actionScore, maxActionScore);
+    const card = el('section', `card novel-result-card result-level-${evalResult.level}`);
 
-    card.appendChild(el('div', 'result-celebrate-badge', '✨ 体験おつかれさまでした！'));
-    card.appendChild(el('h2', 'result-title', `第${episode.episode_id}話「${episode.episode_title}」完了`));
+    card.appendChild(el('div', 'result-verdict-badge', evalResult.badge));
+
+    const verdictBanner = el('div', 'result-verdict-banner');
+    verdictBanner.appendChild(el('p', 'result-verdict-text', evalResult.summary));
+    card.appendChild(verdictBanner);
+
+    card.appendChild(el('h2', 'result-title', `第${episode.episode_id}話「${episode.episode_title}」結果`));
     card.appendChild(el('p', 'novel-text', scene.text));
 
-    // Psychological safety declaration
+    // Separate psychological safety declaration so red danger warning never implies real harm happened
     const safeBox = el('div', 'safety-assurance-banner');
     safeBox.appendChild(
       el(
         'p',
         'safety-assurance-text',
-        '🛡️ 練習のなかで何を試しても大丈夫です。スマートフォンは絶対に壊れません！'
+        '🛡️ ここは練習用の安全な画面ですので、実際にお金が請求されたりスマートフォンが壊れたりすることは絶対にありません！'
       )
     );
     card.appendChild(safeBox);
@@ -518,9 +632,10 @@ export class NovelEngine {
       scoreGrid.appendChild(clueMetric);
     }
 
-    const actionMetric = el('div', 'score-metric-box');
+    const actionMetric = el('div', `score-metric-box is-${evalResult.level}`);
     actionMetric.appendChild(el('span', 'metric-label', '安全行動スコア'));
-    actionMetric.appendChild(el('strong', 'metric-value', `${actionScore} 点`));
+    const scoreDisplay = maxActionScore > 0 ? `${actionScore} / ${maxActionScore} 点` : `${actionScore} 点`;
+    actionMetric.appendChild(el('strong', 'metric-value', scoreDisplay));
     scoreGrid.appendChild(actionMetric);
     card.appendChild(scoreGrid);
 

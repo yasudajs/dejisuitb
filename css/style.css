@@ -20,6 +20,16 @@
   --amber-bg: #fffbeb;
   --amber-border: #fcd34d;
 
+  --green-main: #15803d;
+  --green-dark: #166534;
+  --green-bg: #dcfce7;
+  --green-border: #4ade80;
+
+  --red-main: #b91c1c;
+  --red-dark: #991b1b;
+  --red-bg: #fee2e2;
+  --red-border: #f87171;
+
   --blue-main: #1d4ed8;
   --blue-bg: #eff6ff;
   --blue-border: #bfdbfe;
@@ -760,15 +770,100 @@ body {
 
 /* Result Scene ------------------------------------------------------------- */
 
-.result-celebrate-badge {
+.novel-result-card {
+  border-width: 3px;
+}
+
+.novel-result-card.result-level-good {
+  border-color: var(--green-main);
+  border-top-width: 10px;
+}
+
+.novel-result-card.result-level-caution {
+  border-color: var(--amber-main);
+  border-top-width: 10px;
+}
+
+.novel-result-card.result-level-bad {
+  border-color: var(--red-main);
+  border-top-width: 10px;
+}
+
+.novel-result-card.result-level-neutral {
+  border-color: var(--border-soft);
+  border-top-width: 10px;
+}
+
+.result-verdict-badge {
   display: inline-block;
-  background: var(--amber-bg);
-  color: var(--amber-dark);
-  border: 2px solid var(--amber-border);
-  padding: 0.3rem 0.95rem;
+  padding: 0.45rem 1.1rem;
   border-radius: 999px;
   font-weight: 800;
-  margin-bottom: 0.75rem;
+  font-size: 1.05rem;
+  border: 2px solid transparent;
+  margin-bottom: 0.85rem;
+}
+
+.result-level-good .result-verdict-badge {
+  background: var(--green-main);
+  color: #ffffff;
+  border-color: var(--green-dark);
+}
+
+.result-level-caution .result-verdict-badge {
+  background: var(--amber-bg);
+  color: var(--amber-dark);
+  border-color: var(--amber-main);
+}
+
+.result-level-bad .result-verdict-badge {
+  background: var(--red-main);
+  color: #ffffff;
+  border-color: var(--red-dark);
+}
+
+.result-level-neutral .result-verdict-badge {
+  background: var(--bg-soft);
+  color: var(--text-main);
+  border-color: var(--border-soft);
+}
+
+.result-verdict-banner {
+  border-radius: var(--radius-md);
+  border: 2px solid var(--border-soft);
+  padding: 0.95rem 1.15rem;
+  margin-bottom: 1rem;
+}
+
+.result-verdict-text {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1.7;
+}
+
+.result-level-good .result-verdict-banner {
+  background: var(--green-bg);
+  border-color: var(--green-border);
+  color: var(--green-dark);
+}
+
+.result-level-caution .result-verdict-banner {
+  background: var(--amber-bg);
+  border-color: var(--amber-border);
+  color: var(--amber-dark);
+}
+
+.result-level-bad .result-verdict-banner {
+  background: var(--red-bg);
+  border-color: var(--red-border);
+  color: var(--red-dark);
+}
+
+.result-level-neutral .result-verdict-banner {
+  background: var(--bg-soft);
+  border-color: var(--border-soft);
+  color: var(--text-main);
 }
 
 .result-title {
@@ -789,6 +884,33 @@ body {
   border-radius: var(--radius-md);
   padding: 0.9rem 1rem;
   text-align: center;
+}
+
+.score-metric-box.is-good {
+  background: var(--green-bg);
+  border-color: var(--green-main);
+}
+
+.score-metric-box.is-good .metric-value {
+  color: var(--green-dark);
+}
+
+.score-metric-box.is-caution {
+  background: var(--amber-bg);
+  border-color: var(--amber-main);
+}
+
+.score-metric-box.is-caution .metric-value {
+  color: var(--amber-dark);
+}
+
+.score-metric-box.is-bad {
+  background: var(--red-bg);
+  border-color: var(--red-main);
+}
+
+.score-metric-box.is-bad .metric-value {
+  color: var(--red-dark);
 }
 
 .metric-label {
