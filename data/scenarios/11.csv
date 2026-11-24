@@ -1,0 +1,3 @@
+scene_id,scene_type,speaker,text,sms_sender,sms_time,sms_body,choice1_label,choice1_next,choice1_score,choice2_label,choice2_next,choice2_score,choice3_label,choice3_next,choice3_score,next_scene_id,tip_title,tip_body
+ep11_01,narration,案内役,【第11話：私の耳が嘘をつくはずない（ダミー）】娘そっくりの声で「交通事故の示談金が今すぐ必要」と泣き叫ぶ電話がかかってくる。聴覚の過信による判断の危うさを体験。,,,,,,,,,,,,,ep11_end,,
+ep11_end,result,案内役,第11話の本編シナリオは現在準備中です。担当の方はこのファイル（data/scenarios/11.csv）を編集して物語を追加できます。,,,,,,,,,,,,,,このお話で身につく行動ルール,自分の耳への過信を捨て、一度電話を切って自宅電話や職場の連絡先など別の通信経路で本人確認を行う。

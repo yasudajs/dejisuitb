@@ -1,0 +1,3 @@
+scene_id,scene_type,speaker,text,sms_sender,sms_time,sms_body,choice1_label,choice1_next,choice1_score,choice2_label,choice2_next,choice2_score,choice3_label,choice3_next,choice3_score,next_scene_id,tip_title,tip_body
+ep7_01,narration,案内役,【第7話：優しいあの人の秘密（ダミー）】SNSで親しくなった親切な相手から「海外でトラブルに巻き込まれ一時的な金銭支援が必要」と相談される。,,,,,,,,,,,,,ep7_end,,
+ep7_end,result,案内役,第7話の本編シナリオは現在準備中です。担当の方はこのファイル（data/scenarios/07.csv）を編集して物語を追加できます。,,,,,,,,,,,,, ,このお話で身につく行動ルール,恋愛感情や同情心から送金に応じる前に、信頼できる友人や地域包括支援センターなどの第三者へ相談する。

@@ -1,0 +1,3 @@
+scene_id,scene_type,speaker,text,sms_sender,sms_time,sms_body,choice1_label,choice1_next,choice1_score,choice2_label,choice2_next,choice2_score,choice3_label,choice3_next,choice3_score,next_scene_id,tip_title,tip_body
+ep15_01,narration,案内役,【第15話：偽りの正義と暗証番号（ダミー）】防犯課の警察官を名乗る男から「口座保護のため私服警官がキャッシュカードを預かりに行く。暗証番号も教えよ」と命じられる。,,,,,,,,,,,,,ep15_end,,
+ep15_end,result,案内役,第15話の本編シナリオは現在準備中です。担当の方はこのファイル（data/scenarios/15.csv）を編集して物語を追加できます。,,,,,,,,,,,,,,このお話で身につく行動ルール,警察官が暗証番号を聞くことやキャッシュカードを預かることは絶対にないため、電話を切り110番または#9110へ確認する。

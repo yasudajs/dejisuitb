@@ -1,0 +1,3 @@
+scene_id,scene_type,speaker,text,sms_sender,sms_time,sms_body,choice1_label,choice1_next,choice1_score,choice2_label,choice2_next,choice2_score,choice3_label,choice3_next,choice3_score,next_scene_id,tip_title,tip_body
+ep3_01,narration,案内役,【第3話：消えた給付金の案内（ダミー）】市役所を名乗る給付金案内が届き「申請期限は本日中」と急かされるが、市役所の公式ホームページには記載が見当たらない。,,,,,,,,,,,,,ep3_end,,
+ep3_end,result,案内役,第3話の本編シナリオは現在準備中です。担当の方はこのファイル（data/scenarios/03.csv）を編集して物語を追加できます。,,,,,,,,,,,,, ,このお話で身につく行動ルール,リンク先の偽申請フォームに入力せず、市役所の代表電話や公式広報窓口へ事実関係を確認する。

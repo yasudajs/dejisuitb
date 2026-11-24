@@ -1,0 +1,3 @@
+scene_id,scene_type,speaker,text,sms_sender,sms_time,sms_body,choice1_label,choice1_next,choice1_score,choice2_label,choice2_next,choice2_score,choice3_label,choice3_next,choice3_score,next_scene_id,tip_title,tip_body
+ep10_01,narration,案内役,【第10話：半額セールの落とし穴（ダミー）】欲しかった高額商品が「50%OFF」で売られている通販サイトを発見。決済方法が「個人名義の銀行振込」のみになっている。,,,,,,,,,,,,,ep10_end,,
+ep10_end,result,案内役,第10話の本編シナリオは現在準備中です。担当の方はこのファイル（data/scenarios/10.csv）を編集して物語を追加できます。,,,,,,,,,,,,,,このお話で身につく行動ルール,特定商取引法に基づく表記（住所・電話番号・代表者名）を外部検索で検証し、不審な場合は利用を中止する。

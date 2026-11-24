@@ -1,0 +1,3 @@
+scene_id,scene_type,speaker,text,sms_sender,sms_time,sms_body,choice1_label,choice1_next,choice1_score,choice2_label,choice2_next,choice2_score,choice3_label,choice3_next,choice3_score,next_scene_id,tip_title,tip_body
+ep5_01,narration,案内役,【第5話：あなたに逮捕状が出ています（ダミー）】警察官を名乗る人物から「口座が犯罪に使われ逮捕状が出ている」と連絡があり、ビデオ通話で偽の警察手帳を見せられる。,,,,,,,,,,,,,ep5_end,,
+ep5_end,result,案内役,第5話の本編シナリオは現在準備中です。担当の方はこのファイル（data/scenarios/05.csv）を編集して物語を追加できます。,,,,,,,,,,,,, ,このお話で身につく行動ルール,相手の提示する情報を鵜呑みにせず、一度通話を切って最寄りの警察署または「#9110（警察相談専用電話）」へ自ら発信する。

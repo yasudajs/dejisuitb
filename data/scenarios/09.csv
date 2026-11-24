@@ -1,0 +1,3 @@
+scene_id,scene_type,speaker,text,sms_sender,sms_time,sms_body,choice1_label,choice1_next,choice1_score,choice2_label,choice2_next,choice2_score,choice3_label,choice3_next,choice3_score,next_scene_id,tip_title,tip_body
+ep9_01,narration,案内役,【第9話：突然鳴り出した警告音（ダミー）】Webサイト閲覧中に大音量の警告音と「ウイルスに感染しました。直ちに電話してください」という全画面警告が出る。,,,,,,,,,,,,,ep9_end,,
+ep9_end,result,案内役,第9話の本編シナリオは現在準備中です。担当の方はこのファイル（data/scenarios/09.csv）を編集して物語を追加できます。,,,,,,,,,,,,,,このお話で身につく行動ルール,画面内の「×」や「OK」を押さず、ブラウザを閉じるか端末の電源を再起動する。

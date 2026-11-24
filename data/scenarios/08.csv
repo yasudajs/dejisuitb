@@ -1,0 +1,3 @@
+scene_id,scene_type,speaker,text,sms_sender,sms_time,sms_body,choice1_label,choice1_next,choice1_score,choice2_label,choice2_next,choice2_score,choice3_label,choice3_next,choice3_score,next_scene_id,tip_title,tip_body
+ep8_01,narration,案内役,【第8話：増え続ける謎の資産（ダミー）】投資グループチャットで大きな利益が出ているように見えるが、出金しようとすると「保証金や追加手数料が必要」と要求される。,,,,,,,,,,,,,ep8_end,,
+ep8_end,result,案内役,第8話の本編シナリオは現在準備中です。担当の方はこのファイル（data/scenarios/08.csv）を編集して物語を追加できます。,,,,,,,,,,,,, ,このお話で身につく行動ルール,追加の支払いをきっぱりと拒絶し、金融庁の無登録業者リストの照会や警察相談窓口への相談を行う。
