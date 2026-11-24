@@ -464,11 +464,10 @@ export class NovelEngine {
     progressTrack.appendChild(progressFill);
     header.appendChild(progressTrack);
 
-    this.container.appendChild(header);
-
-    // Scene body by scene_type
+    // Scene body by scene_type (render main game/result card above progress header)
     if (scene.scene_type === 'result') {
       this.renderResultScene(scene);
+      this.container.appendChild(header);
       return;
     }
 
@@ -526,6 +525,7 @@ export class NovelEngine {
 
     stage.appendChild(footer);
     this.container.appendChild(stage);
+    this.container.appendChild(header);
   }
 
   /**
