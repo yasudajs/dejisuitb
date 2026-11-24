@@ -147,6 +147,26 @@ export function evaluateResultLevel(actionScore, maxActionScore) {
 }
 
 /**
+ * Evaluate clue discovery level ('good' | 'caution' | 'bad' | 'neutral').
+ * 0 -> red (bad), partial -> yellow (caution), all -> green (good).
+ * @param {number} discoveredCount
+ * @param {number} totalClues
+ * @returns {{ level: 'good'|'caution'|'bad'|'neutral', note: string }}
+ */
+export function evaluateClueLevel(discoveredCount, totalClues) {
+  if (!totalClues || totalClues <= 0) {
+    return { level: 'neutral', note: '' };
+  }
+  if (discoveredCount <= 0) {
+    return { level: 'bad', note: '怪しい点を見逃してしまいました' };
+  }
+  if (discoveredCount >= totalClues) {
+    return { level: 'good', note: 'すべて見つけられました！' };
+  }
+  return { level: 'caution', note: '一部見つけられました（あと少し！）' };
+}
+
+/**
  * Helper to create a DOM element safely with textContent and classes.
  */
 function el(tag, className = '', text = '') {
@@ -624,11 +644,15 @@ export class NovelEngine {
     // Score summary grid
     const scoreGrid = el('div', 'result-score-grid');
     if (totalClues > 0) {
-      const clueMetric = el('div', 'score-metric-box');
+      const clueEval = evaluateClueLevel(discoveredClues.size, totalClues);
+      const clueMetric = el('div', `score-metric-box is-${clueEval.level}`);
       clueMetric.appendChild(el('span', 'metric-label', '見つけた怪しいサイン'));
       clueMetric.appendChild(
         el('strong', 'metric-value', `${discoveredClues.size} / ${totalClues} 個`)
       );
+      if (clueEval.note) {
+        clueMetric.appendChild(el('span', 'metric-note', clueEval.note));
+      }
       scoreGrid.appendChild(clueMetric);
     }
 

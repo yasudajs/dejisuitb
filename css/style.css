@@ -891,7 +891,8 @@ body {
   border-color: var(--green-main);
 }
 
-.score-metric-box.is-good .metric-value {
+.score-metric-box.is-good .metric-value,
+.score-metric-box.is-good .metric-note {
   color: var(--green-dark);
 }
 
@@ -900,7 +901,8 @@ body {
   border-color: var(--amber-main);
 }
 
-.score-metric-box.is-caution .metric-value {
+.score-metric-box.is-caution .metric-value,
+.score-metric-box.is-caution .metric-note {
   color: var(--amber-dark);
 }
 
@@ -909,7 +911,8 @@ body {
   border-color: var(--red-main);
 }
 
-.score-metric-box.is-bad .metric-value {
+.score-metric-box.is-bad .metric-value,
+.score-metric-box.is-bad .metric-note {
   color: var(--red-dark);
 }
 
@@ -925,6 +928,14 @@ body {
   font-size: 1.55rem;
   color: var(--teal-dark);
   margin-top: 0.2rem;
+}
+
+.metric-note {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  margin-top: 0.25rem;
 }
 
 .helpline-list {
