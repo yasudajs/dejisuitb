@@ -43,20 +43,20 @@ export function getSpeakerRole(speaker) {
 const ROLE_VOICE_KEYWORDS = {
   narrator: ['keita', 'ichiro', 'otoya', 'hattori', 'jad', 'male', '男性', 'google 日本語'],
   you: ['haruka', 'kyoko', 'sayaka', 'jab', 'nanami', 'google 日本語'],
-  daughter: ['nanami', 'ayumi', 'o-ren', 'oren', 'jac', 'sayaka', 'google 日本語'],
+  daughter: ['ayumi', 'mayu', 'shiori', 'nanami', 'o-ren', 'oren', 'jac', 'sayaka', 'google 日本語'],
 };
 
 const VOICE_PROFILES_DISTINCT = {
   narrator: { rate: 0.9, pitch: 0.96 },
   you: { rate: 0.87, pitch: 0.94 },
-  daughter: { rate: 0.98, pitch: 1.12 },
+  daughter: { rate: 1.05, pitch: 1.26 },
   guide: { rate: 0.92, pitch: 1.04 },
 };
 
 const VOICE_PROFILES_SINGLE = {
   narrator: { rate: 0.9, pitch: 0.85 },
   you: { rate: 0.86, pitch: 1.0 },
-  daughter: { rate: 1.0, pitch: 1.28 },
+  daughter: { rate: 1.07, pitch: 1.42 },
   guide: { rate: 0.92, pitch: 1.06 },
 };
 
