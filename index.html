@@ -6,7 +6,7 @@
   <title>スマホのもしも帖｜IT学習・三現主義支援プラットフォーム（プロトタイプ）</title>
   <link rel="stylesheet" href="./css/style.css" />
 </head>
-<body>
+<body class="is-title-view">
   <!-- Persistent Fixed-Position Top Bar (4.1 UI要件: 恒常的な戻る・ホームボタン) -->
   <header class="app-header" role="banner">
     <div class="header-inner">
@@ -29,8 +29,38 @@
   </header>
 
   <main class="app-main" id="app-main">
-    <!-- View: Home -->
-    <section id="view-home" class="app-view">
+    <!-- View: Title Cover (1ページ目) -->
+    <section id="view-title" class="app-view title-view" aria-label="タイトル画面">
+      <div class="title-stage">
+        <button
+          id="btn-title-start"
+          type="button"
+          class="title-cover-btn"
+          aria-label="スマホのもしも帖 詐欺トレ をはじめる（次の画面へ進む）"
+        >
+          <img
+            src="./images/title-cover.jpg"
+            alt="スマホのもしも帖 詐欺トレ 〜詐欺に備えて鍛えるべし〜 TAP TO START"
+            class="title-cover-img"
+            width="1024"
+            height="571"
+          />
+        </button>
+        <div class="title-actions">
+          <button
+            id="btn-title-start-sub"
+            type="button"
+            class="btn btn-primary btn-large title-start-btn"
+          >
+            ▶ はじめる（次へ進む）
+          </button>
+          <p class="title-tap-hint">※上のイラストをタップしても進めます</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- View: Home (2ページ目) -->
+    <section id="view-home" class="app-view" hidden>
       <div class="card hero-card">
         <div class="safety-assurance-banner">
           <p class="safety-assurance-text">

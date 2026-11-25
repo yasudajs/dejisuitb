@@ -10,7 +10,9 @@
 
 ```text
 dejisuitb/
-├── index.html                    # アプリ本体
+├── index.html                    # アプリ本体（1ページ目：タイトル画面 / 2ページ目以降：メニュー・各機能画面）
+├── images/
+│   └── title-cover.jpg           # 1ページ目：タイトルカバー画像
 ├── css/
 │   └── style.css                 # 高齢者・初心者向けUIスタイル
 ├── js/
