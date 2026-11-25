@@ -26,6 +26,10 @@ function el(tag, className = '', text = '') {
  * @param {boolean} pushHistory
  */
 function navigateTo(nextView, pushHistory = true) {
+  if (nextView !== 'novel') {
+    novelEngine?.stopSpeech();
+  }
+
   if (pushHistory && appState.currentView && appState.currentView !== nextView) {
     appState.viewHistory.push(appState.currentView);
   }
@@ -234,6 +238,9 @@ async function initApp() {
       );
     }
   }
+
+  window.addEventListener('pagehide', () => novelEngine?.stopSpeech());
+  window.addEventListener('beforeunload', () => novelEngine?.stopSpeech());
 
   navigateTo('home', false);
 }

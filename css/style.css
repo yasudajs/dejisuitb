@@ -632,6 +632,15 @@ body {
   object-fit: cover;
 }
 
+.novel-speaker-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  margin-bottom: 0.9rem;
+}
+
 .speaker-badge {
   display: inline-block;
   padding: 0.25rem 0.9rem;
@@ -639,6 +648,48 @@ body {
   font-weight: 800;
   font-size: 0.95rem;
   margin-bottom: 0.9rem;
+}
+
+.novel-speaker-row .speaker-badge {
+  margin-bottom: 0;
+}
+
+.novel-speech-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+  margin-left: auto;
+}
+
+.btn-speech-toggle.is-on {
+  background-color: var(--teal-bg);
+  color: var(--teal-dark);
+  border-color: var(--teal-border);
+}
+
+.btn-speech-toggle.is-on:hover {
+  background-color: #d1fae5;
+}
+
+.btn-speech-toggle.is-off {
+  background-color: var(--bg-soft);
+  color: var(--text-muted);
+  border-color: var(--border-soft);
+}
+
+.btn-speech-toggle.is-off:hover {
+  background-color: #e6dfd1;
+}
+
+.btn-speech-replay {
+  background-color: var(--amber-bg);
+  color: var(--amber-dark);
+  border-color: var(--amber-border);
+}
+
+.btn-speech-replay:hover {
+  background-color: #fde68a;
 }
 
 .speaker-narration {

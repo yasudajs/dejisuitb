@@ -1,4 +1,5 @@
 import { loadCSV } from './csvParser.js';
+import { SpeechPlayer } from './speechPlayer.js';
 
 /**
  * Parse [[visible text|explanation]] tokens into ordered segments.
@@ -223,6 +224,14 @@ export class NovelEngine {
     this.container = container;
     this.callbacks = callbacks;
     this.state = null;
+    this.speechPlayer = new SpeechPlayer();
+  }
+
+  /**
+   * Stop any active browser speech synthesis.
+   */
+  stopSpeech() {
+    this.speechPlayer?.stop();
   }
 
   /**
@@ -231,6 +240,7 @@ export class NovelEngine {
    * @param {boolean} forcePlayDummy
    */
   async startEpisode(episode, forcePlayDummy = false) {
+    this.stopSpeech();
     this.container.innerHTML = '';
     const loadingBox = el('div', 'card state-box', 'お話を読み込んでいます…');
     this.container.appendChild(loadingBox);
@@ -293,7 +303,7 @@ export class NovelEngine {
         showHint: false,
       };
 
-      this.renderCurrentScene();
+      this.renderCurrentScene({ autoSpeak: true });
     } catch (err) {
       this.container.innerHTML = '';
       const errBox = el('div', 'card state-box');
@@ -319,6 +329,7 @@ export class NovelEngine {
    * @param {Record<string, string>} episode
    */
   renderDummyPreview(episode) {
+    this.stopSpeech();
     this.container.innerHTML = '';
     const card = el('article', 'card novel-preview-card');
 
@@ -401,7 +412,7 @@ export class NovelEngine {
     this.state.activeClueFeedback = null;
     this.state.showHint = false;
 
-    this.renderCurrentScene();
+    this.renderCurrentScene({ autoSpeak: true });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
@@ -416,14 +427,15 @@ export class NovelEngine {
     this.state.discoveredClues = prev.discoveredClues;
     this.state.activeClueFeedback = null;
     this.state.showHint = false;
-    this.renderCurrentScene();
+    this.renderCurrentScene({ autoSpeak: true });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   /**
    * Render the active scene card.
+   * @param {{ autoSpeak?: boolean }} [options]
    */
-  renderCurrentScene() {
+  renderCurrentScene({ autoSpeak = false } = {}) {
     if (!this.state) return;
     const { episode, sceneMap, sceneOrder, currentSceneId, scenes } = this.state;
     const scene = sceneMap.get(currentSceneId);
@@ -466,6 +478,9 @@ export class NovelEngine {
 
     // Scene body by scene_type (render main game/result card above progress header)
     if (scene.scene_type === 'result') {
+      if (autoSpeak) {
+        this.speechPlayer.speakDialogueIfEnabled(scene);
+      }
       this.renderResultScene(scene);
       this.container.appendChild(header);
       return;
@@ -484,15 +499,52 @@ export class NovelEngine {
       );
     }
 
-    // Speaker badge
+    // Speaker badge + speech controls
     const speaker = (scene.speaker || '').trim();
-    if (speaker) {
-      let speakerClass = 'speaker-badge';
-      if (speaker.includes('あなた')) speakerClass += ' speaker-you';
-      else if (speaker.includes('娘') || speaker.includes('家族')) speakerClass += ' speaker-family';
-      else if (speaker.includes('案内')) speakerClass += ' speaker-guide';
-      else speakerClass += ' speaker-narration';
-      stage.appendChild(el('div', speakerClass, speaker));
+    const speechSupported = this.speechPlayer.isSupported();
+    if (speaker || speechSupported) {
+      const speakerRow = el('div', 'novel-speaker-row');
+      if (speaker) {
+        let speakerClass = 'speaker-badge';
+        if (speaker.includes('あなた')) speakerClass += ' speaker-you';
+        else if (speaker.includes('娘') || speaker.includes('家族')) speakerClass += ' speaker-family';
+        else if (speaker.includes('案内')) speakerClass += ' speaker-guide';
+        else speakerClass += ' speaker-narration';
+        speakerRow.appendChild(el('div', speakerClass, speaker));
+      }
+
+      if (speechSupported) {
+        const controls = el('div', 'novel-speech-controls');
+        if (scene.scene_type === 'dialogue') {
+          const replayBtn = el('button', 'btn btn-small btn-speech-replay', '🔁 もういちど聞く');
+          replayBtn.type = 'button';
+          replayBtn.addEventListener('click', () => {
+            this.speechPlayer.speak(scene.text, { speaker });
+          });
+          controls.appendChild(replayBtn);
+        }
+
+        const enabled = this.speechPlayer.enabled;
+        const toggleBtn = el(
+          'button',
+          `btn btn-small btn-speech-toggle ${enabled ? 'is-on' : 'is-off'}`,
+          enabled ? '🔊 セリフ音声：オン' : '🔇 セリフ音声：オフ'
+        );
+        toggleBtn.type = 'button';
+        toggleBtn.setAttribute('aria-pressed', enabled ? 'true' : 'false');
+        toggleBtn.addEventListener('click', () => {
+          const nextEnabled = !this.speechPlayer.enabled;
+          this.speechPlayer.setEnabled(nextEnabled);
+          this.renderCurrentScene({ autoSpeak: false });
+          if (nextEnabled && scene.scene_type === 'dialogue') {
+            this.speechPlayer.speak(scene.text, { speaker });
+          }
+        });
+        controls.appendChild(toggleBtn);
+        speakerRow.appendChild(controls);
+      }
+
+      stage.appendChild(speakerRow);
     }
 
     // Main novel text
@@ -526,6 +578,10 @@ export class NovelEngine {
     stage.appendChild(footer);
     this.container.appendChild(stage);
     this.container.appendChild(header);
+
+    if (autoSpeak) {
+      this.speechPlayer.speakDialogueIfEnabled(scene);
+    }
   }
 
   /**
