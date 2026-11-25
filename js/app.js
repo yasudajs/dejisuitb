@@ -5,7 +5,7 @@ import { KnowledgeDbView } from './knowledgeDb.js';
 const appState = {
   episodes: [],
   knowledgeRecords: [],
-  currentView: 'home',
+  currentView: 'title',
   viewHistory: [],
 };
 
@@ -22,7 +22,7 @@ function el(tag, className = '', text = '') {
 
 /**
  * Switch active view and record navigation history.
- * @param {'home'|'episodes'|'novel'|'db'} nextView
+ * @param {'title'|'home'|'episodes'|'novel'|'db'} nextView
  * @param {boolean} pushHistory
  */
 function navigateTo(nextView, pushHistory = true) {
@@ -30,7 +30,9 @@ function navigateTo(nextView, pushHistory = true) {
     novelEngine?.stopSpeech();
   }
 
-  if (pushHistory && appState.currentView && appState.currentView !== nextView) {
+  if (nextView === 'title') {
+    appState.viewHistory = [];
+  } else if (pushHistory && appState.currentView && appState.currentView !== nextView) {
     appState.viewHistory.push(appState.currentView);
   }
   appState.currentView = nextView;
@@ -39,14 +41,16 @@ function navigateTo(nextView, pushHistory = true) {
     section.hidden = section.id !== `view-${nextView}`;
   });
 
+  document.body.classList.toggle('is-title-view', nextView === 'title');
+
   // Update persistent back button availability
   if (elements.globalBackBtn) {
-    const canGoBack = appState.viewHistory.length > 0 || nextView !== 'home';
+    const canGoBack = appState.viewHistory.length > 0 || nextView !== 'title';
     elements.globalBackBtn.disabled = !canGoBack;
     elements.globalBackBtn.setAttribute('aria-disabled', String(!canGoBack));
   }
 
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  window.scrollTo({ top: 0, behavior: nextView === 'title' ? 'auto' : 'smooth' });
 }
 
 /**
@@ -56,7 +60,9 @@ function handleGlobalBack() {
   if (appState.viewHistory.length > 0) {
     const prev = appState.viewHistory.pop();
     navigateTo(prev, false);
-  } else if (appState.currentView !== 'home') {
+  } else if (appState.currentView === 'home') {
+    navigateTo('title', false);
+  } else if (appState.currentView !== 'title') {
     navigateTo('home', false);
   }
 }
@@ -179,10 +185,17 @@ async function initApp() {
 
   // Wire persistent header navigation
   elements.globalHomeBtn.addEventListener('click', () => {
-    appState.viewHistory = [];
+    appState.viewHistory = ['title'];
     navigateTo('home', false);
   });
   elements.globalBackBtn.addEventListener('click', handleGlobalBack);
+
+  // Wire title cover screen entry buttons
+  const startFromTitle = () => {
+    navigateTo('home', true);
+  };
+  document.getElementById('btn-title-start')?.addEventListener('click', startFromTitle);
+  document.getElementById('btn-title-start-sub')?.addEventListener('click', startFromTitle);
 
   // Wire home entry buttons
   document.getElementById('btn-open-episodes').addEventListener('click', () => {
@@ -207,6 +220,8 @@ async function initApp() {
     onNavigateDb: () => navigateTo('db'),
   });
   knowledgeDbView = new KnowledgeDbView(elements.dbContainer);
+
+  navigateTo('title', false);
 
   try {
     const [episodes, knowledgeRecords] = await Promise.all([
@@ -241,8 +256,6 @@ async function initApp() {
 
   window.addEventListener('pagehide', () => novelEngine?.stopSpeech());
   window.addEventListener('beforeunload', () => novelEngine?.stopSpeech());
-
-  navigateTo('home', false);
 }
 
 document.addEventListener('DOMContentLoaded', initApp);
