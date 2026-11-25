@@ -1,5 +1,5 @@
 /**
- * Clean dialogue text for natural Japanese speech synthesis.
+ * Clean scene text for natural Japanese speech synthesis.
  * Trims whitespace and strips outer Japanese quotation marks.
  * @param {string} rawText
  * @returns {string}
@@ -34,16 +34,21 @@ export function getSpeakerVoiceProfile(speaker) {
   if (name.includes('あなた')) {
     return { rate: 0.88, pitch: 0.98 };
   }
+  if (name.includes('案内')) {
+    return { rate: 0.9, pitch: 1.04 };
+  }
   return { rate: 0.9, pitch: 1.0 };
 }
 
 /**
- * Browser Web Speech API wrapper for reading dialogue scenes aloud.
+ * Browser Web Speech API wrapper for reading story scenes aloud.
  */
 export class SpeechPlayer {
   constructor() {
     this.enabled = true;
     this.preferredVoice = null;
+    this._pendingTimer = null;
+    this._currentUtterance = null;
 
     if (this.isSupported()) {
       this._refreshVoices();
@@ -85,14 +90,13 @@ export class SpeechPlayer {
     const pool = exactJaJp.length ? exactJaJp : jaVoices;
 
     this.preferredVoice =
-      pool.find((v) => v.localService && !v.default) ||
-      pool.find((v) => v.localService) ||
       pool.find((v) => v.default) ||
+      pool.find((v) => v.localService) ||
       pool[0];
   }
 
   /**
-   * Enable or disable automatic dialogue speech.
+   * Enable or disable automatic scene speech.
    * @param {boolean} flag
    */
   setEnabled(flag) {
@@ -103,15 +107,24 @@ export class SpeechPlayer {
   }
 
   /**
-   * Immediately cancel any active or queued speech synthesis.
+   * Immediately cancel any pending timer or active/queued speech synthesis.
    */
   stop() {
+    if (this._pendingTimer !== null) {
+      clearTimeout(this._pendingTimer);
+      this._pendingTimer = null;
+    }
+    this._currentUtterance = null;
+
     if (!this.isSupported()) return;
-    window.speechSynthesis.cancel();
+    const synth = window.speechSynthesis;
+    if (synth.speaking || synth.pending) {
+      synth.cancel();
+    }
   }
 
   /**
-   * Speak the given text immediately, canceling any prior utterance first.
+   * Speak the given text, safely handling Chrome/Edge/Safari cancel-then-speak behavior.
    * @param {string} text
    * @param {{ speaker?: string }} [options]
    * @returns {boolean}
@@ -119,6 +132,8 @@ export class SpeechPlayer {
   speak(text, { speaker = '' } = {}) {
     if (!this.isSupported()) return false;
 
+    const synth = window.speechSynthesis;
+    const wasBusy = Boolean(synth.speaking || synth.pending);
     this.stop();
 
     const cleaned = cleanSpeechText(text);
@@ -138,19 +153,44 @@ export class SpeechPlayer {
     utterance.rate = profile.rate;
     utterance.pitch = profile.pitch;
 
-    window.speechSynthesis.speak(utterance);
+    const clearCurrent = () => {
+      if (this._currentUtterance === utterance) {
+        this._currentUtterance = null;
+      }
+    };
+    utterance.onend = clearCurrent;
+    utterance.onerror = clearCurrent;
+
+    const startSpeak = () => {
+      this._currentUtterance = utterance;
+      if (synth.paused && typeof synth.resume === 'function') {
+        synth.resume();
+      }
+      synth.speak(utterance);
+    };
+
+    if (wasBusy) {
+      this._pendingTimer = setTimeout(() => {
+        this._pendingTimer = null;
+        startSpeak();
+      }, 60);
+    } else {
+      startSpeak();
+    }
+
     return true;
   }
 
   /**
-   * Cancel any active speech and automatically speak if enabled and scene is a dialogue.
+   * Automatically speak the scene text if speech is enabled and text is present.
    * @param {Record<string, string>|null|undefined} scene
    * @returns {boolean}
    */
-  speakDialogueIfEnabled(scene) {
-    this.stop();
-    if (!this.enabled || !scene) return false;
-    if ((scene.scene_type || '').trim() !== 'dialogue') return false;
+  speakSceneIfEnabled(scene) {
+    if (!this.enabled || !scene || !(scene.text || '').trim()) {
+      this.stop();
+      return false;
+    }
     return this.speak(scene.text, { speaker: (scene.speaker || '').trim() });
   }
 }

@@ -479,7 +479,7 @@ export class NovelEngine {
     // Scene body by scene_type (render main game/result card above progress header)
     if (scene.scene_type === 'result') {
       if (autoSpeak) {
-        this.speechPlayer.speakDialogueIfEnabled(scene);
+        this.speechPlayer.speakSceneIfEnabled(scene);
       }
       this.renderResultScene(scene);
       this.container.appendChild(header);
@@ -514,34 +514,7 @@ export class NovelEngine {
       }
 
       if (speechSupported) {
-        const controls = el('div', 'novel-speech-controls');
-        if (scene.scene_type === 'dialogue') {
-          const replayBtn = el('button', 'btn btn-small btn-speech-replay', '🔁 もういちど聞く');
-          replayBtn.type = 'button';
-          replayBtn.addEventListener('click', () => {
-            this.speechPlayer.speak(scene.text, { speaker });
-          });
-          controls.appendChild(replayBtn);
-        }
-
-        const enabled = this.speechPlayer.enabled;
-        const toggleBtn = el(
-          'button',
-          `btn btn-small btn-speech-toggle ${enabled ? 'is-on' : 'is-off'}`,
-          enabled ? '🔊 セリフ音声：オン' : '🔇 セリフ音声：オフ'
-        );
-        toggleBtn.type = 'button';
-        toggleBtn.setAttribute('aria-pressed', enabled ? 'true' : 'false');
-        toggleBtn.addEventListener('click', () => {
-          const nextEnabled = !this.speechPlayer.enabled;
-          this.speechPlayer.setEnabled(nextEnabled);
-          this.renderCurrentScene({ autoSpeak: false });
-          if (nextEnabled && scene.scene_type === 'dialogue') {
-            this.speechPlayer.speak(scene.text, { speaker });
-          }
-        });
-        controls.appendChild(toggleBtn);
-        speakerRow.appendChild(controls);
+        speakerRow.appendChild(this._createSpeechControls(scene));
       }
 
       stage.appendChild(speakerRow);
@@ -580,8 +553,47 @@ export class NovelEngine {
     this.container.appendChild(header);
 
     if (autoSpeak) {
-      this.speechPlayer.speakDialogueIfEnabled(scene);
+      this.speechPlayer.speakSceneIfEnabled(scene);
     }
+  }
+
+  /**
+   * Build replay and mute/unmute buttons for the active scene.
+   * @param {Record<string, string>} scene
+   * @returns {HTMLElement}
+   */
+  _createSpeechControls(scene) {
+    const controls = el('div', 'novel-speech-controls');
+    const speaker = (scene.speaker || '').trim();
+    const hasText = Boolean((scene.text || '').trim());
+
+    if (hasText) {
+      const replayBtn = el('button', 'btn btn-small btn-speech-replay', '🔁 もういちど聞く');
+      replayBtn.type = 'button';
+      replayBtn.addEventListener('click', () => {
+        this.speechPlayer.speak(scene.text, { speaker });
+      });
+      controls.appendChild(replayBtn);
+    }
+
+    const enabled = this.speechPlayer.enabled;
+    const toggleBtn = el(
+      'button',
+      `btn btn-small btn-speech-toggle ${enabled ? 'is-on' : 'is-off'}`,
+      enabled ? '🔊 音声読み上げ：オン' : '🔇 音声読み上げ：オフ'
+    );
+    toggleBtn.type = 'button';
+    toggleBtn.setAttribute('aria-pressed', enabled ? 'true' : 'false');
+    toggleBtn.addEventListener('click', () => {
+      const nextEnabled = !this.speechPlayer.enabled;
+      this.speechPlayer.setEnabled(nextEnabled);
+      this.renderCurrentScene({ autoSpeak: false });
+      if (nextEnabled && hasText) {
+        this.speechPlayer.speak(scene.text, { speaker });
+      }
+    });
+    controls.appendChild(toggleBtn);
+    return controls;
   }
 
   /**
@@ -748,6 +760,12 @@ export class NovelEngine {
           `第${episode.episode_id}話「${episode.episode_title}」の結果イラスト`
         )
       );
+    }
+
+    if (this.speechPlayer.isSupported()) {
+      const controlsRow = el('div', 'novel-speaker-row');
+      controlsRow.appendChild(this._createSpeechControls(scene));
+      card.appendChild(controlsRow);
     }
 
     card.appendChild(el('p', 'novel-text', scene.text));
