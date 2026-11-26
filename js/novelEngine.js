@@ -37,6 +37,8 @@ const TRAP_PHRASES = [
   },
 ];
 
+const SMS_PRAISE_VOICES = ['あっぱれ！', 'お見事！', 'ご名答！'];
+
 /**
  * Check whether an episode uses the Episode 1 apple collection mechanic.
  * @param {Record<string, string>|null|undefined} episode
@@ -464,6 +466,7 @@ export class NovelEngine {
     this._effectTimers = [];
     this._lastPraiseIdx = -1;
     this._lastTrapIdx = -1;
+    this._smsPraiseCursor = 0;
   }
 
   /**
@@ -564,6 +567,7 @@ export class NovelEngine {
       const maxActionScore = computeMaxActionScore(scenes);
       const appleMode = isAppleEpisode(episode);
       const appleGoal = appleMode ? computeEpisodeAppleGoal(scenes, totalClues) : 0;
+      this._smsPraiseCursor = 0;
 
       this.state = {
         episode,
@@ -800,7 +804,10 @@ export class NovelEngine {
 
     const stage = el('section', 'card novel-stage');
 
-    if (this.state.isAppleMode) {
+    const showAppleHud =
+      this.state.isAppleMode &&
+      (scene.scene_type === 'sms' || scene.scene_type === 'choice');
+    if (showAppleHud) {
       stage.appendChild(this.renderAppleHud());
       this.state.latestAppleGain = false;
     }
@@ -953,8 +960,15 @@ export class NovelEngine {
     const feedbackArea = el('div', 'clue-feedback-area');
     if (this.state.activeClueFeedback) {
       const fb = el('div', 'info-panel info-panel-teal clue-feedback-card');
+      const calloutPrefix = this.state.activeClueFeedback.callout
+        ? `${this.state.activeClueFeedback.callout} `
+        : '';
       fb.appendChild(
-        el('h3', 'panel-heading', `🔍 見つけました！「${this.state.activeClueFeedback.text}」`)
+        el(
+          'h3',
+          'panel-heading',
+          `🔍 ${calloutPrefix}見つけました！「${this.state.activeClueFeedback.text}」`
+        )
       );
       if (this.state.activeClueFeedback.gainedApple) {
         fb.appendChild(
@@ -1041,18 +1055,26 @@ export class NovelEngine {
               this.state.earnedAppleIds.add(appleKey);
               gainedApple = true;
               this.state.latestAppleGain = true;
-              this.speechPlayer.playSfx('apple');
             }
           } else {
             this.state.latestAppleGain = false;
           }
 
+          const praiseCallout =
+            SMS_PRAISE_VOICES[this._smsPraiseCursor % SMS_PRAISE_VOICES.length];
+          this._smsPraiseCursor += 1;
+
           this.state.activeClueFeedback = {
             text: seg.text,
             explanation: seg.explanation,
             gainedApple,
+            callout: praiseCallout,
           };
           this.renderCurrentScene();
+
+          if (this.speechPlayer.enabled) {
+            this.speechPlayer.speak(praiseCallout, { speaker: '称賛' });
+          }
         });
         parent.appendChild(btn);
       }
@@ -1165,7 +1187,9 @@ export class NovelEngine {
       const speechMsg = gainedApple
         ? `${phrase.speech} りんごを1つゲットしました！`
         : phrase.speech;
-      this.speechPlayer.speakFeedback(speechMsg, 'praise');
+      if (this.speechPlayer.enabled) {
+        this.speechPlayer.speak(speechMsg, { speaker: '称賛' });
+      }
     } else {
       this.speechPlayer.speakFeedback(phrase.speech, 'trap');
     }
