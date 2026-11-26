@@ -24,10 +24,16 @@ export function cleanSpeechText(rawText) {
 /**
  * Map a speaker label from scenario CSV to a normalized role key.
  * @param {string} speaker
- * @returns {'narrator'|'you'|'daughter'|'guide'}
+ * @returns {'narrator'|'you'|'daughter'|'guide'|'praise'|'trap'}
  */
 export function getSpeakerRole(speaker) {
   const name = (speaker || '').trim();
+  if (name.includes('称賛') || name.includes('ほめ') || name === 'praise') {
+    return 'praise';
+  }
+  if (name.includes('罠') || name.includes('警告') || name === 'trap') {
+    return 'trap';
+  }
   if (name.includes('娘') || name.includes('家族')) {
     return 'daughter';
   }
@@ -51,6 +57,8 @@ const VOICE_PROFILES_DISTINCT = {
   you: { rate: 0.87, pitch: 0.94 },
   daughter: { rate: 1.05, pitch: 1.26 },
   guide: { rate: 0.92, pitch: 1.04 },
+  praise: { rate: 0.98, pitch: 1.22 },
+  trap: { rate: 0.94, pitch: 0.82 },
 };
 
 const VOICE_PROFILES_SINGLE = {
@@ -58,6 +66,8 @@ const VOICE_PROFILES_SINGLE = {
   you: { rate: 0.86, pitch: 1.0 },
   daughter: { rate: 1.07, pitch: 1.42 },
   guide: { rate: 0.92, pitch: 1.06 },
+  praise: { rate: 0.98, pitch: 1.3 },
+  trap: { rate: 0.94, pitch: 0.76 },
 };
 
 /**
@@ -120,13 +130,15 @@ export function assignRoleVoices(voices) {
   const you = pickVoiceForRole(ROLE_VOICE_KEYWORDS.you);
   const daughter = pickVoiceForRole(ROLE_VOICE_KEYWORDS.daughter);
   const guide = narrator || pool[0] || null;
+  const praise = daughter || you || guide || pool[0] || null;
+  const trap = narrator || guide || pool[0] || null;
 
   const distinctCount = new Set(
     [narrator, you, daughter].map(getVoiceId).filter(Boolean)
   ).size;
 
   return {
-    roleVoices: { narrator, you, daughter, guide },
+    roleVoices: { narrator, you, daughter, guide, praise, trap },
     distinctCount,
   };
 }
@@ -155,6 +167,7 @@ export class SpeechPlayer {
     this.hasDistinctVoices = false;
     this._pendingTimer = null;
     this._currentUtterance = null;
+    this._audioCtx = null;
 
     if (this.isSupported()) {
       this._refreshVoices();
@@ -279,6 +292,120 @@ export class SpeechPlayer {
     }
 
     return true;
+  }
+
+  /**
+   * Lazily initialize Web Audio context inside a user gesture or playback flow.
+   * @returns {AudioContext|null}
+   */
+  _getAudioContext() {
+    if (typeof window === 'undefined') return null;
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return null;
+
+    try {
+      if (!this._audioCtx) {
+        this._audioCtx = new AudioCtx();
+      }
+      if (this._audioCtx.state === 'suspended' && typeof this._audioCtx.resume === 'function') {
+        this._audioCtx.resume().catch(() => {});
+      }
+      return this._audioCtx;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Schedule a single synthesized tone with smooth attack and decay.
+   * @param {AudioContext} ctx
+   * @param {number} startTime
+   * @param {number} freq
+   * @param {number} duration
+   * @param {{ type?: OscillatorType, peak?: number, endFreq?: number|null }} [options]
+   */
+  _playTone(ctx, startTime, freq, duration, { type = 'sine', peak = 0.14, endFreq = null } = {}) {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, startTime);
+    if (endFreq && endFreq > 0) {
+      osc.frequency.exponentialRampToValueAtTime(endFreq, startTime + duration);
+    }
+
+    gain.gain.setValueAtTime(0.0001, startTime);
+    gain.gain.linearRampToValueAtTime(peak, startTime + 0.015);
+    gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(startTime);
+    osc.stop(startTime + duration + 0.02);
+  }
+
+  /**
+   * Play lightweight celebratory or warning sound effects via Web Audio API.
+   * @param {'praise'|'trap'|'apple'|'fanfare'} type
+   */
+  playSfx(type) {
+    if (!this.enabled) return;
+    const ctx = this._getAudioContext();
+    if (!ctx) return;
+
+    try {
+      const now = ctx.currentTime + 0.01;
+      if (type === 'praise') {
+        [523.25, 659.25, 783.99, 1046.5].forEach((freq, idx) => {
+          this._playTone(ctx, now + idx * 0.08, freq, 0.24, {
+            type: idx === 3 ? 'sine' : 'triangle',
+            peak: idx === 3 ? 0.16 : 0.13,
+          });
+        });
+      } else if (type === 'trap') {
+        // Sharp wooden clapper pop followed by dramatic low descending warning tones
+        this._playTone(ctx, now, 980, 0.06, { type: 'square', peak: 0.08, endFreq: 380 });
+        [392, 311.13, 233.08].forEach((freq, idx) => {
+          this._playTone(ctx, now + 0.04 + idx * 0.11, freq, 0.24, {
+            type: idx === 0 ? 'triangle' : 'sawtooth',
+            peak: idx === 0 ? 0.12 : 0.075,
+          });
+        });
+      } else if (type === 'apple') {
+        this._playTone(ctx, now, 783.99, 0.13, { type: 'sine', peak: 0.14 });
+        this._playTone(ctx, now + 0.075, 1046.5, 0.22, { type: 'sine', peak: 0.16 });
+      } else if (type === 'fanfare') {
+        const notes = [523.25, 587.33, 659.25, 783.99, 880, 1046.5, 1318.5];
+        notes.forEach((freq, idx) => {
+          const t = now + idx * 0.085;
+          const isFinal = idx === notes.length - 1;
+          this._playTone(ctx, t, freq, isFinal ? 0.65 : 0.22, {
+            type: isFinal ? 'triangle' : 'sine',
+            peak: isFinal ? 0.16 : 0.12,
+          });
+        });
+        // Warm ending chord + shimmer overtones
+        [523.25, 659.25, 783.99, 1046.5].forEach((freq) => {
+          this._playTone(ctx, now + 0.56, freq, 0.72, { type: 'triangle', peak: 0.07 });
+        });
+        [1567.98, 2093.0].forEach((freq, idx) => {
+          this._playTone(ctx, now + 0.68 + idx * 0.1, freq, 0.35, { type: 'sine', peak: 0.06 });
+        });
+      }
+    } catch {
+      // Ignore audio scheduling errors in restricted browser environments
+    }
+  }
+
+  /**
+   * Play feedback SFX and speak feedback text with praise or trap voice styling.
+   * @param {string} text
+   * @param {'praise'|'trap'|'fanfare'} [kind]
+   * @returns {boolean}
+   */
+  speakFeedback(text, kind = 'praise') {
+    if (!this.enabled) return false;
+    this.playSfx(kind);
+    return this.speak(text, { speaker: kind === 'trap' ? '罠' : '称賛' });
   }
 
   /**

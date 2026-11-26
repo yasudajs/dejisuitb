@@ -1,6 +1,242 @@
 import { loadCSV } from './csvParser.js';
 import { SpeechPlayer } from './speechPlayer.js';
 
+const PRAISE_PHRASES = [
+  {
+    display: 'お見事！',
+    sub: 'すばらしい判断です！',
+    speech: 'お見事！すばらしい判断ですね！',
+  },
+  {
+    display: 'ご名答！',
+    sub: 'よく見抜きましたね！',
+    speech: 'ご名答！しっかり見抜きましたね！',
+  },
+  {
+    display: 'あっぱれ！',
+    sub: '見事な対応です！',
+    speech: 'あっぱれ！本当に見事な対応です！',
+  },
+];
+
+const TRAP_PHRASES = [
+  {
+    display: '引っかかったな！',
+    sub: '危ない！詐欺の手口に気をつけましょう',
+    speech: '引っかかったな！一度立ち止まって確認しましょう！',
+  },
+  {
+    display: 'あぶない！',
+    sub: 'そのまま進むと危険な場面です',
+    speech: 'あぶない！危うく詐欺の罠にかかるところでしたよ！',
+  },
+  {
+    display: 'そこが罠じゃ！',
+    sub: 'あわてず立ち止まるのが大切です',
+    speech: 'そこが罠じゃ！あわてずに気をつけましょう！',
+  },
+];
+
+/**
+ * Check whether an episode uses the Episode 1 apple collection mechanic.
+ * @param {Record<string, string>|null|undefined} episode
+ * @returns {boolean}
+ */
+export function isAppleEpisode(episode) {
+  return String(episode?.episode_id || '').trim() === '1';
+}
+
+/**
+ * Compute total apples achievable on a perfect run (SMS clues + optimal choice count).
+ * @param {Array<Record<string, string>>} scenes
+ * @param {number} totalClues
+ * @returns {number}
+ */
+export function computeEpisodeAppleGoal(scenes, totalClues) {
+  if (!Array.isArray(scenes) || scenes.length === 0) {
+    return Math.max(1, totalClues + 1);
+  }
+
+  const sceneMap = new Map();
+  scenes.forEach((raw) => {
+    const id = (raw.scene_id || '').trim();
+    if (!id) return;
+    sceneMap.set(id, {
+      ...raw,
+      scene_id: id,
+      scene_type: (raw.scene_type || 'narration').trim(),
+      next_scene_id: (raw.next_scene_id || '').trim(),
+      choice1_next: (raw.choice1_next || '').trim(),
+      choice2_next: (raw.choice2_next || '').trim(),
+      choice3_next: (raw.choice3_next || '').trim(),
+    });
+  });
+
+  const startId = (scenes[0].scene_id || '').trim();
+  if (!startId || !sceneMap.has(startId)) {
+    return Math.max(1, totalClues + 1);
+  }
+
+  function dfs(sceneId, visited) {
+    if (!sceneId || visited.has(sceneId) || !sceneMap.has(sceneId)) {
+      return { score: 0, choices: 0 };
+    }
+    const scene = sceneMap.get(sceneId);
+    if (scene.scene_type === 'result') {
+      return { score: 0, choices: 0 };
+    }
+
+    const nextVisited = new Set(visited);
+    nextVisited.add(sceneId);
+
+    if (scene.scene_type === 'choice') {
+      let best = { score: -1, choices: 0 };
+      for (let i = 1; i <= 3; i++) {
+        const nextId = scene[`choice${i}_next`];
+        if (!nextId) continue;
+        const pts = Number.parseInt(scene[`choice${i}_score`] || '0', 10) || 0;
+        const sub = dfs(nextId, nextVisited);
+        const totalScore = pts + sub.score;
+        const totalChoices = (pts > 0 ? 1 : 0) + sub.choices;
+        if (totalScore > best.score) {
+          best = { score: totalScore, choices: totalChoices };
+        }
+      }
+      return best.score >= 0 ? best : { score: 0, choices: 0 };
+    }
+
+    if (scene.next_scene_id) {
+      return dfs(scene.next_scene_id, nextVisited);
+    }
+    return { score: 0, choices: 0 };
+  }
+
+  const optimal = dfs(startId, new Set());
+  return Math.max(1, totalClues + Math.max(1, optimal.choices));
+}
+
+/**
+ * Create a gleaming Golden Apple inline SVG illustration.
+ * @returns {SVGSVGElement}
+ */
+function createGoldenAppleSvg() {
+  const svgNS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(svgNS, 'svg');
+  svg.setAttribute('viewBox', '0 0 160 160');
+  svg.setAttribute('class', 'golden-apple-svg');
+  svg.setAttribute('aria-hidden', 'true');
+
+  const defs = document.createElementNS(svgNS, 'defs');
+
+  const bodyGrad = document.createElementNS(svgNS, 'radialGradient');
+  bodyGrad.setAttribute('id', 'goldenAppleBodyGrad');
+  bodyGrad.setAttribute('cx', '36%');
+  bodyGrad.setAttribute('cy', '30%');
+  bodyGrad.setAttribute('r', '70%');
+  [
+    ['0%', '#fffde4'],
+    ['28%', '#fde047'],
+    ['68%', '#f59e0b'],
+    ['100%', '#b45309'],
+  ].forEach(([offset, color]) => {
+    const stop = document.createElementNS(svgNS, 'stop');
+    stop.setAttribute('offset', offset);
+    stop.setAttribute('stop-color', color);
+    bodyGrad.appendChild(stop);
+  });
+
+  const leafGrad = document.createElementNS(svgNS, 'linearGradient');
+  leafGrad.setAttribute('id', 'goldenAppleLeafGrad');
+  leafGrad.setAttribute('x1', '0%');
+  leafGrad.setAttribute('y1', '0%');
+  leafGrad.setAttribute('x2', '100%');
+  leafGrad.setAttribute('y2', '100%');
+  [
+    ['0%', '#fef08a'],
+    ['55%', '#84cc16'],
+    ['100%', '#15803d'],
+  ].forEach(([offset, color]) => {
+    const stop = document.createElementNS(svgNS, 'stop');
+    stop.setAttribute('offset', offset);
+    stop.setAttribute('stop-color', color);
+    leafGrad.appendChild(stop);
+  });
+
+  defs.appendChild(bodyGrad);
+  defs.appendChild(leafGrad);
+  svg.appendChild(defs);
+
+  // Soft outer aura ring
+  const aura = document.createElementNS(svgNS, 'circle');
+  aura.setAttribute('cx', '80');
+  aura.setAttribute('cy', '88');
+  aura.setAttribute('r', '60');
+  aura.setAttribute('fill', 'rgba(253, 224, 71, 0.28)');
+  svg.appendChild(aura);
+
+  // Stem
+  const stem = document.createElementNS(svgNS, 'path');
+  stem.setAttribute('d', 'M80 42 C78 27, 83 18, 90 14');
+  stem.setAttribute('fill', 'none');
+  stem.setAttribute('stroke', '#78350f');
+  stem.setAttribute('stroke-width', '7');
+  stem.setAttribute('stroke-linecap', 'round');
+  svg.appendChild(stem);
+
+  // Leaf
+  const leaf = document.createElementNS(svgNS, 'path');
+  leaf.setAttribute('d', 'M82 34 C94 14, 118 16, 121 31 C108 42, 92 40, 82 34 Z');
+  leaf.setAttribute('fill', 'url(#goldenAppleLeafGrad)');
+  leaf.setAttribute('stroke', '#92400e');
+  leaf.setAttribute('stroke-width', '2.5');
+  svg.appendChild(leaf);
+
+  // Apple body
+  const body = document.createElementNS(svgNS, 'path');
+  body.setAttribute(
+    'd',
+    'M80 45 C65 36, 35 42, 31 74 C27 108, 49 142, 68 142 C74 142, 77 139, 80 139 C83 139, 86 142, 92 142 C111 142, 133 108, 129 74 C125 42, 95 36, 80 45 Z'
+  );
+  body.setAttribute('fill', 'url(#goldenAppleBodyGrad)');
+  body.setAttribute('stroke', '#92400e');
+  body.setAttribute('stroke-width', '3.5');
+  svg.appendChild(body);
+
+  // Gloss highlight
+  const highlight = document.createElementNS(svgNS, 'ellipse');
+  highlight.setAttribute('cx', '57');
+  highlight.setAttribute('cy', '71');
+  highlight.setAttribute('rx', '11');
+  highlight.setAttribute('ry', '20');
+  highlight.setAttribute('transform', 'rotate(-20 57 71)');
+  highlight.setAttribute('fill', 'rgba(255, 255, 255, 0.72)');
+  svg.appendChild(highlight);
+
+  const highlightDot = document.createElementNS(svgNS, 'circle');
+  highlightDot.setAttribute('cx', '49');
+  highlightDot.setAttribute('cy', '96');
+  highlightDot.setAttribute('r', '4.5');
+  highlightDot.setAttribute('fill', 'rgba(255, 255, 255, 0.65)');
+  svg.appendChild(highlightDot);
+
+  // Radiating sparkle stars
+  const sparkles = [
+    'M23 44 L26 52 L34 55 L26 58 L23 66 L20 58 L12 55 L20 52 Z',
+    'M135 48 L137.5 54.5 L144 57 L137.5 59.5 L135 66 L132.5 59.5 L126 57 L132.5 54.5 Z',
+    'M130 118 L132 123 L137 125 L132 127 L130 132 L128 127 L123 125 L128 123 Z',
+  ];
+  sparkles.forEach((d) => {
+    const star = document.createElementNS(svgNS, 'path');
+    star.setAttribute('d', d);
+    star.setAttribute('fill', '#fef08a');
+    star.setAttribute('stroke', '#b45309');
+    star.setAttribute('stroke-width', '1.2');
+    svg.appendChild(star);
+  });
+
+  return svg;
+}
+
 /**
  * Parse [[visible text|explanation]] tokens into ordered segments.
  * @param {string} rawText
@@ -225,13 +461,53 @@ export class NovelEngine {
     this.callbacks = callbacks;
     this.state = null;
     this.speechPlayer = new SpeechPlayer();
+    this._effectTimers = [];
+    this._lastPraiseIdx = -1;
+    this._lastTrapIdx = -1;
   }
 
   /**
-   * Stop any active browser speech synthesis.
+   * Clear any pending animation or transition timers.
+   */
+  clearEffectTimers() {
+    if (Array.isArray(this._effectTimers)) {
+      this._effectTimers.forEach((timerId) => clearTimeout(timerId));
+    }
+    this._effectTimers = [];
+  }
+
+  /**
+   * Pick a phrase entry randomly without immediately repeating the previous phrase.
+   * @param {Array<{display: string, sub: string, speech: string}>} list
+   * @param {'_lastPraiseIdx'|'_lastTrapIdx'} lastKey
+   */
+  _pickPhrase(list, lastKey) {
+    if (!list.length) return { display: '', sub: '', speech: '' };
+    let idx = Math.floor(Math.random() * list.length);
+    if (list.length > 1 && idx === this[lastKey]) {
+      idx = (idx + 1) % list.length;
+    }
+    this[lastKey] = idx;
+    return list[idx];
+  }
+
+  /**
+   * Check whether the current episode clear qualifies as a zero-mistake full-score clear.
+   * @returns {boolean}
+   */
+  _isPerfectClear() {
+    if (!this.state) return false;
+    const { actionScore, maxActionScore, wrongChoiceCount } = this.state;
+    return maxActionScore > 0 && actionScore >= maxActionScore && wrongChoiceCount === 0;
+  }
+
+  /**
+   * Stop any active browser speech synthesis, effect timers, and open choice overlays.
    */
   stopSpeech() {
+    this.clearEffectTimers();
     this.speechPlayer?.stop();
+    this.container?.querySelectorAll('.choice-callout-overlay').forEach((node) => node.remove());
   }
 
   /**
@@ -286,6 +562,8 @@ export class NovelEngine {
       });
 
       const maxActionScore = computeMaxActionScore(scenes);
+      const appleMode = isAppleEpisode(episode);
+      const appleGoal = appleMode ? computeEpisodeAppleGoal(scenes, totalClues) : 0;
 
       this.state = {
         episode,
@@ -301,6 +579,13 @@ export class NovelEngine {
         totalClues,
         activeClueFeedback: null,
         showHint: false,
+        isAppleMode: appleMode,
+        appleGoal,
+        earnedAppleIds: new Set(),
+        latestAppleGain: false,
+        wrongChoiceCount: 0,
+        correctChoiceCount: 0,
+        activeChoiceFeedback: null,
       };
 
       this.renderCurrentScene({ autoSpeak: true });
@@ -393,23 +678,43 @@ export class NovelEngine {
    * Push snapshot and transition to next scene ID.
    * @param {string} nextSceneId
    * @param {number} scoreDelta
+   * @param {{ appleKey?: string|null, choiceOutcome?: 'correct'|'wrong'|null }} [meta]
    */
-  advanceTo(nextSceneId, scoreDelta = 0) {
+  advanceTo(nextSceneId, scoreDelta = 0, meta = {}) {
     if (!this.state) return;
     const targetId = (nextSceneId || '').trim();
     if (!targetId || !this.state.sceneMap.has(targetId)) {
       return;
     }
 
+    this.clearEffectTimers();
+
     this.state.history.push({
       sceneId: this.state.currentSceneId,
       actionScore: this.state.actionScore,
       discoveredClues: new Set(this.state.discoveredClues),
+      earnedAppleIds: new Set(this.state.earnedAppleIds),
+      wrongChoiceCount: this.state.wrongChoiceCount,
+      correctChoiceCount: this.state.correctChoiceCount,
     });
 
     this.state.actionScore += scoreDelta;
+
+    let gainedApple = false;
+    if (meta.appleKey && this.state.isAppleMode && !this.state.earnedAppleIds.has(meta.appleKey)) {
+      this.state.earnedAppleIds.add(meta.appleKey);
+      gainedApple = true;
+    }
+    if (meta.choiceOutcome === 'correct') {
+      this.state.correctChoiceCount += 1;
+    } else if (meta.choiceOutcome === 'wrong') {
+      this.state.wrongChoiceCount += 1;
+    }
+
     this.state.currentSceneId = targetId;
     this.state.activeClueFeedback = null;
+    this.state.activeChoiceFeedback = null;
+    this.state.latestAppleGain = gainedApple;
     this.state.showHint = false;
 
     this.renderCurrentScene({ autoSpeak: true });
@@ -421,11 +726,17 @@ export class NovelEngine {
    */
   stepBack() {
     if (!this.state || this.state.history.length === 0) return;
+    this.clearEffectTimers();
     const prev = this.state.history.pop();
     this.state.currentSceneId = prev.sceneId;
     this.state.actionScore = prev.actionScore;
     this.state.discoveredClues = prev.discoveredClues;
+    this.state.earnedAppleIds = prev.earnedAppleIds || new Set();
+    this.state.wrongChoiceCount = prev.wrongChoiceCount || 0;
+    this.state.correctChoiceCount = prev.correctChoiceCount || 0;
     this.state.activeClueFeedback = null;
+    this.state.activeChoiceFeedback = null;
+    this.state.latestAppleGain = false;
     this.state.showHint = false;
     this.renderCurrentScene({ autoSpeak: true });
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -437,6 +748,7 @@ export class NovelEngine {
    */
   renderCurrentScene({ autoSpeak = false } = {}) {
     if (!this.state) return;
+    this.clearEffectTimers();
     const { episode, sceneMap, sceneOrder, currentSceneId, scenes } = this.state;
     const scene = sceneMap.get(currentSceneId);
     if (!scene) return;
@@ -478,15 +790,20 @@ export class NovelEngine {
 
     // Scene body by scene_type (render main game/result card above progress header)
     if (scene.scene_type === 'result') {
-      if (autoSpeak) {
+      if (autoSpeak && !this._isPerfectClear()) {
         this.speechPlayer.speakSceneIfEnabled(scene);
       }
-      this.renderResultScene(scene);
+      this.renderResultScene(scene, { autoSpeak });
       this.container.appendChild(header);
       return;
     }
 
     const stage = el('section', 'card novel-stage');
+
+    if (this.state.isAppleMode) {
+      stage.appendChild(this.renderAppleHud());
+      this.state.latestAppleGain = false;
+    }
 
     // Scene illustration (from the episode's own folder)
     const sceneImageUrl = resolveSceneImage(this.state.scenarioDir, scene.image);
@@ -639,6 +956,15 @@ export class NovelEngine {
       fb.appendChild(
         el('h3', 'panel-heading', `🔍 見つけました！「${this.state.activeClueFeedback.text}」`)
       );
+      if (this.state.activeClueFeedback.gainedApple) {
+        fb.appendChild(
+          el(
+            'div',
+            'clue-apple-badge',
+            `🍎 りんごを1つゲット！（現在 ${this.state.earnedAppleIds.size} / ${this.state.appleGoal} 個）`
+          )
+        );
+      }
       fb.appendChild(el('p', 'panel-body', this.state.activeClueFeedback.explanation));
       feedbackArea.appendChild(fb);
     } else if (this.state.discoveredClues.size > 0) {
@@ -705,10 +1031,26 @@ export class NovelEngine {
         btn.type = 'button';
         btn.setAttribute('aria-pressed', isFound ? 'true' : 'false');
         btn.addEventListener('click', () => {
+          const isNewClue = !this.state.discoveredClues.has(clueKey);
           this.state.discoveredClues.add(clueKey);
+
+          let gainedApple = false;
+          if (isNewClue && this.state.isAppleMode) {
+            const appleKey = `clue::${clueKey}`;
+            if (!this.state.earnedAppleIds.has(appleKey)) {
+              this.state.earnedAppleIds.add(appleKey);
+              gainedApple = true;
+              this.state.latestAppleGain = true;
+              this.speechPlayer.playSfx('apple');
+            }
+          } else {
+            this.state.latestAppleGain = false;
+          }
+
           this.state.activeClueFeedback = {
             text: seg.text,
             explanation: seg.explanation,
+            gainedApple,
           };
           this.renderCurrentScene();
         });
@@ -718,30 +1060,334 @@ export class NovelEngine {
   }
 
   /**
+   * Render Episode 1 apple collection HUD bar.
+   * @returns {HTMLElement}
+   */
+  renderAppleHud() {
+    const earnedCount = this.state.earnedAppleIds.size;
+    const goalCount = Math.max(1, this.state.appleGoal);
+    const slotCount = Math.max(goalCount, earnedCount);
+
+    const hud = el('div', 'apple-hud-bar');
+    const top = el('div', 'apple-hud-top');
+    top.appendChild(el('span', 'apple-hud-label', '🍎 集めたリンゴ'));
+    top.appendChild(el('span', 'apple-hud-count', `${earnedCount} / ${goalCount} 個`));
+    hud.appendChild(top);
+
+    const slots = el('div', 'apple-slots');
+    slots.setAttribute('role', 'img');
+    slots.setAttribute('aria-label', `集めたリンゴ ${earnedCount}個 / 全${goalCount}個`);
+    for (let i = 0; i < slotCount; i++) {
+      const isEarned = i < earnedCount;
+      const isNewest = this.state.latestAppleGain && i === earnedCount - 1;
+      const slot = el(
+        'span',
+        `apple-slot ${isEarned ? 'is-earned' : 'is-empty'}${isNewest ? ' is-newly-earned' : ''}`,
+        '🍎'
+      );
+      slot.setAttribute('aria-hidden', 'true');
+      slots.appendChild(slot);
+    }
+    hud.appendChild(slots);
+    hud.appendChild(
+      el(
+        'p',
+        'apple-hud-note',
+        '1つ正解するたびにリンゴを1つゲット！全問正解で黄金のリンゴ＆免許皆伝の巻物が授与されます。'
+      )
+    );
+
+    return hud;
+  }
+
+  /**
    * Render up to 3 large choice buttons.
    */
   renderChoiceBlock(stage, scene) {
     const choiceList = el('div', 'choice-list');
+    const choices = [];
     for (let idx = 1; idx <= 3; idx++) {
       const label = (scene[`choice${idx}_label`] || '').trim();
       const nextId = (scene[`choice${idx}_next`] || '').trim();
       const score = Number.parseInt(scene[`choice${idx}_score`] || '0', 10) || 0;
       if (!label || !nextId) continue;
-
-      const btn = el('button', 'btn btn-choice btn-large', label);
-      btn.type = 'button';
-      btn.addEventListener('click', () => this.advanceTo(nextId, score));
-      choiceList.appendChild(btn);
+      choices.push({ label, nextId, score });
     }
+
+    const maxSceneChoiceScore = choices.reduce((max, item) => Math.max(max, item.score), 0);
+
+    choices.forEach((choice) => {
+      const btn = el('button', 'btn btn-choice btn-large', choice.label);
+      btn.type = 'button';
+      btn.addEventListener('click', () =>
+        this.handleChoiceSelect(scene, { ...choice, maxSceneChoiceScore })
+      );
+      choiceList.appendChild(btn);
+    });
     stage.appendChild(choiceList);
   }
 
   /**
-   * Render color-coded completion summary, score, learning tip, and official helplines.
+   * Handle choice click: show praise/trap feedback overlay + audio, then proceed on button tap.
+   * @param {Record<string, string>} scene
+   * @param {{ label: string, nextId: string, score: number, maxSceneChoiceScore: number }} choice
    */
-  renderResultScene(scene) {
+  handleChoiceSelect(scene, choice) {
+    if (!this.state) return;
+    if (choice.maxSceneChoiceScore <= 0) {
+      this.advanceTo(choice.nextId, choice.score);
+      return;
+    }
+
+    const isCorrect = choice.score > 0;
+    const phrase = isCorrect
+      ? this._pickPhrase(PRAISE_PHRASES, '_lastPraiseIdx')
+      : this._pickPhrase(TRAP_PHRASES, '_lastTrapIdx');
+
+    const appleKey = isCorrect && this.state.isAppleMode ? `choice::${scene.scene_id}` : null;
+    const gainedApple = Boolean(appleKey && !this.state.earnedAppleIds.has(appleKey));
+    const appleCount = this.state.earnedAppleIds.size + (gainedApple ? 1 : 0);
+
+    this.state.activeChoiceFeedback = {
+      isCorrect,
+      phrase,
+      nextId: choice.nextId,
+      score: choice.score,
+      appleKey,
+      gainedApple,
+      appleCount,
+      appleGoal: this.state.appleGoal,
+    };
+
+    this.renderChoiceCalloutOverlay();
+
+    if (isCorrect) {
+      const speechMsg = gainedApple
+        ? `${phrase.speech} りんごを1つゲットしました！`
+        : phrase.speech;
+      this.speechPlayer.speakFeedback(speechMsg, 'praise');
+    } else {
+      this.speechPlayer.speakFeedback(phrase.speech, 'trap');
+    }
+  }
+
+  /**
+   * Render dramatic praise/trap feedback modal over the active scene.
+   */
+  renderChoiceCalloutOverlay() {
+    const fb = this.state?.activeChoiceFeedback;
+    if (!fb) return;
+
+    this.container.querySelectorAll('.choice-callout-overlay').forEach((node) => node.remove());
+
+    const overlay = el('div', 'choice-callout-overlay');
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.setAttribute('aria-labelledby', 'choice-callout-stamp');
+
+    const card = el(
+      'div',
+      `choice-callout-card ${fb.isCorrect ? 'is-correct' : 'is-wrong'}`
+    );
+
+    card.appendChild(
+      el('span', 'choice-callout-kicker', fb.isCorrect ? '✨ 大正解！ ✨' : '⚠️ ご注意！ ⚠️')
+    );
+
+    const stamp = el('h3', 'choice-callout-stamp', fb.phrase.display);
+    stamp.id = 'choice-callout-stamp';
+    card.appendChild(stamp);
+
+    card.appendChild(el('p', 'choice-callout-sub', fb.phrase.sub));
+
+    if (fb.gainedApple) {
+      card.appendChild(
+        el(
+          'div',
+          'choice-callout-apple-gain',
+          `🍎 りんごを1つゲット！（現在 ${fb.appleCount} / ${fb.appleGoal} 個）`
+        )
+      );
+    }
+
+    const nextBtn = el(
+      'button',
+      `btn btn-large choice-callout-next ${fb.isCorrect ? 'btn-primary' : 'btn-secondary'}`,
+      'つぎへ進む ▶'
+    );
+    nextBtn.type = 'button';
+    nextBtn.addEventListener('click', () => {
+      overlay.remove();
+      this.advanceTo(fb.nextId, fb.score, {
+        appleKey: fb.appleKey,
+        choiceOutcome: fb.isCorrect ? 'correct' : 'wrong',
+      });
+    });
+    card.appendChild(nextBtn);
+
+    overlay.appendChild(card);
+    this.container.appendChild(overlay);
+    nextBtn.focus({ preventScroll: true });
+  }
+
+  /**
+   * Build the two-stage Perfect Clear showcase (Golden Apple transformation + Master Scroll award).
+   * @param {{ episode: Record<string, string>, appleCount: number, discoveredCount: number, totalClues: number, autoSpeak: boolean }} opts
+   * @returns {HTMLElement}
+   */
+  _createPerfectClearShowcase({ episode, appleCount, discoveredCount, totalClues, autoSpeak }) {
+    const showcase = el('section', 'perfect-clear-showcase');
+    showcase.setAttribute('aria-label', '全問正解の特別表彰');
+
+    showcase.appendChild(
+      el('div', 'perfect-clear-header', '🎊 全問正解！パーフェクトクリア！ 🎊')
+    );
+
+    const stagesGrid = el('div', 'perfect-clear-stages');
+
+    // Stage 1: Red Apples -> Glittering Golden Apple
+    const stage1 = el('div', 'perfect-stage-card golden-apple-stage');
+    stage1.id = 'stage-golden-apple';
+    stage1.appendChild(el('span', 'stage-badge', '✨ 第一段：黄金のリンゴ ✨'));
+
+    const chamber = el('div', 'apple-transform-chamber');
+
+    const cluster = el('div', 'red-apples-cluster');
+    const row = el('div', 'red-apples-row');
+    const displayApples = Math.max(1, appleCount);
+    for (let i = 0; i < displayApples; i++) {
+      const appleIcon = el('span', 'cluster-apple', '🍎');
+      appleIcon.style.setProperty('--apple-idx', String(i));
+      row.appendChild(appleIcon);
+    }
+    cluster.appendChild(row);
+    cluster.appendChild(
+      el('p', 'cluster-status', '集めたリンゴがキラキラと輝きだした…！')
+    );
+    chamber.appendChild(cluster);
+
+    const emblem = el('div', 'golden-apple-emblem');
+    const rays = el('div', 'golden-rays');
+    rays.setAttribute('aria-hidden', 'true');
+    emblem.appendChild(rays);
+
+    const sparkleLayer = el('div', 'sparkle-layer');
+    sparkleLayer.setAttribute('aria-hidden', 'true');
+    ['✨', '★', '✨', '✦', '✨'].forEach((symbol, idx) => {
+      sparkleLayer.appendChild(el('span', `sparkle sp-${idx + 1}`, symbol));
+    });
+    emblem.appendChild(sparkleLayer);
+    emblem.appendChild(createGoldenAppleSvg());
+    emblem.appendChild(el('span', 'golden-badge-tag', '✨ 黄金のリンゴ ✨'));
+    chamber.appendChild(emblem);
+
+    stage1.appendChild(chamber);
+    stage1.appendChild(
+      el(
+        'p',
+        'golden-apple-caption',
+        this.state.isAppleMode
+          ? `集めた ${displayApples} 個のリンゴが、まばゆく輝く『黄金のリンゴ』に変化しました！`
+          : '全問正解の証『黄金のリンゴ』が誕生しました！'
+      )
+    );
+    stagesGrid.appendChild(stage1);
+
+    // Stage 2: Scroll of Mastery (免許皆伝の巻物)
+    const stage2 = el('div', 'perfect-stage-card scroll-stage');
+    stage2.id = 'stage-master-scroll';
+    stage2.appendChild(el('span', 'stage-badge', '📜 第二段：免許皆伝の巻物（称号）'));
+
+    const scroll = el('div', 'master-scroll');
+    const createRoller = (pos) => {
+      const roller = el('div', `scroll-roller scroll-roller-${pos}`);
+      roller.appendChild(el('span', 'roller-cap'));
+      roller.appendChild(el('span', 'roller-rod'));
+      roller.appendChild(el('span', 'roller-cap'));
+      return roller;
+    };
+    scroll.appendChild(createRoller('top'));
+
+    const scrollBody = el('div', 'scroll-body');
+    const scrollInner = el('div', 'scroll-inner');
+    scrollInner.appendChild(el('div', 'scroll-hanko', '皆伝'));
+    scrollInner.appendChild(el('p', 'scroll-kicker', '称号授与'));
+    scrollInner.appendChild(el('h3', 'scroll-heading', '免許皆伝'));
+    scrollInner.appendChild(
+      el(
+        'p',
+        'scroll-title-ribbon',
+        this.state.isAppleMode
+          ? '「詐欺見抜き師・壱の巻」'
+          : `「スマホ見守り達人・第${episode.episode_id}巻」`
+      )
+    );
+    scrollInner.appendChild(
+      el(
+        'p',
+        'scroll-inscription',
+        `第${episode.episode_id}話「${episode.episode_title}」全問正解の証として、この巻物を授与する。`
+      )
+    );
+    if (totalClues > 0 && discoveredCount >= totalClues) {
+      scrollInner.appendChild(
+        el('div', 'scroll-clue-seal', `★ 怪しいサイン完全発見（${totalClues}/${totalClues}）`)
+      );
+    }
+    scrollBody.appendChild(scrollInner);
+    scroll.appendChild(scrollBody);
+    scroll.appendChild(createRoller('bottom'));
+    stage2.appendChild(scroll);
+
+    stagesGrid.appendChild(stage2);
+    showcase.appendChild(stagesGrid);
+
+    const runPerfectSequence = (playAudio) => {
+      this.clearEffectTimers();
+      stage1.classList.remove('is-transformed');
+      stage2.classList.remove('is-unfurled');
+      void showcase.offsetWidth;
+
+      if (playAudio && this.speechPlayer.enabled) {
+        this.speechPlayer.speakFeedback(
+          'あっぱれ！全問正解です！集めたリンゴがキラキラと黄金のリンゴに変化し、免許皆伝の巻物が授与されました！',
+          'fanfare'
+        );
+      }
+
+      const t1 = setTimeout(() => {
+        stage1.classList.add('is-transformed');
+      }, 850);
+      const t2 = setTimeout(() => {
+        stage2.classList.add('is-unfurled');
+      }, 1050);
+      this._effectTimers.push(t1, t2);
+    };
+
+    const replayBtn = el(
+      'button',
+      'btn btn-secondary btn-medium perfect-replay-btn',
+      '🔁 黄金のリンゴ＆巻物の演出をもういちど見る'
+    );
+    replayBtn.id = 'btn-replay-perfect-fx';
+    replayBtn.type = 'button';
+    replayBtn.addEventListener('click', () => runPerfectSequence(true));
+    showcase.appendChild(replayBtn);
+
+    runPerfectSequence(autoSpeak);
+    return showcase;
+  }
+
+  /**
+   * Render color-coded completion summary, score, learning tip, and official helplines.
+   * @param {Record<string, string>} scene
+   * @param {{ autoSpeak?: boolean }} [options]
+   */
+  renderResultScene(scene, { autoSpeak = false } = {}) {
     const { episode, discoveredClues, totalClues, actionScore, maxActionScore } = this.state;
     const evalResult = evaluateResultLevel(actionScore, maxActionScore);
+    const isPerfectClear = this._isPerfectClear();
+    const appleCount = this.state.earnedAppleIds.size;
     const card = el('section', `card novel-result-card result-level-${evalResult.level}`);
 
     card.appendChild(el('div', 'result-verdict-badge', evalResult.badge));
@@ -751,6 +1397,35 @@ export class NovelEngine {
     card.appendChild(verdictBanner);
 
     card.appendChild(el('h2', 'result-title', `第${episode.episode_id}話「${episode.episode_title}」結果`));
+
+    if (isPerfectClear) {
+      card.appendChild(
+        this._createPerfectClearShowcase({
+          episode,
+          appleCount,
+          discoveredCount: discoveredClues.size,
+          totalClues,
+          autoSpeak,
+        })
+      );
+    } else if (this.state.isAppleMode) {
+      const appleBox = el('div', 'apple-result-summary');
+      appleBox.appendChild(
+        el(
+          'p',
+          'apple-result-count',
+          `🍎 今回集めたリンゴ：${appleCount} / ${this.state.appleGoal} 個`
+        )
+      );
+      appleBox.appendChild(
+        el(
+          'p',
+          'apple-result-hint',
+          '全問正解すると、集めたリンゴがキラキラと『黄金のリンゴ』に変化して『免許皆伝の巻物（称号）』が授与されます！ぜひもう一度挑戦してみましょう。'
+        )
+      );
+      card.appendChild(appleBox);
+    }
 
     const resultImageUrl = resolveSceneImage(this.state.scenarioDir, scene.image);
     if (resultImageUrl) {
@@ -801,6 +1476,32 @@ export class NovelEngine {
     const scoreDisplay = maxActionScore > 0 ? `${actionScore} / ${maxActionScore} 点` : `${actionScore} 点`;
     actionMetric.appendChild(el('strong', 'metric-value', scoreDisplay));
     scoreGrid.appendChild(actionMetric);
+
+    if (this.state.isAppleMode) {
+      const appleMetric = el(
+        'div',
+        `score-metric-box ${isPerfectClear ? 'is-golden' : 'is-caution'}`
+      );
+      appleMetric.appendChild(el('span', 'metric-label', '集めたリンゴ'));
+      appleMetric.appendChild(
+        el(
+          'strong',
+          'metric-value',
+          isPerfectClear ? '✨ 黄金のリンゴ' : `${appleCount} / ${this.state.appleGoal} 個`
+        )
+      );
+      appleMetric.appendChild(
+        el(
+          'span',
+          'metric-note',
+          isPerfectClear
+            ? `${Math.max(1, appleCount)}個が黄金に昇華・免許皆伝！`
+            : '全問正解で黄金のリンゴに変化'
+        )
+      );
+      scoreGrid.appendChild(appleMetric);
+    }
+
     card.appendChild(scoreGrid);
 
     // Key takeaway tip
