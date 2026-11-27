@@ -199,7 +199,7 @@ function renderEpisodesList() {
       const btn = el(
         'button',
         `btn btn-large ${isPlayable ? 'btn-primary' : 'btn-outline'}`,
-        isPlayable ? '▶ 第1話を体験する' : '概要を見る（準備中）'
+        isPlayable ? `▶ 第${ep.episode_id}話を体験する` : '概要を見る（準備中）'
       );
       btn.type = 'button';
       btn.addEventListener('click', () => {
