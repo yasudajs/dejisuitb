@@ -52,6 +52,27 @@ const ROLE_VOICE_KEYWORDS = {
   daughter: ['ayumi', 'mayu', 'shiori', 'nanami', 'o-ren', 'oren', 'jac', 'sayaka', 'google 日本語'],
 };
 
+const PREGENERATED_SCENE_IDS = new Set([
+  'ep1_01',
+  'ep1_02',
+  'ep1_03',
+  'ep1_04',
+  'ep1_05',
+  'ep1_06',
+  'ep1_07',
+  'ep1_08',
+  'ep1_09',
+  'ep1_url_1',
+  'ep1_url_2',
+  'ep1_url_choice',
+  'ep1_app_1',
+  'ep1_call_1',
+  'ep1_call_2',
+  'ep1_end_best',
+  'ep1_end_recover',
+  'ep1_end_learn',
+]);
+
 const VOICE_PROFILES_DISTINCT = {
   narrator: { rate: 0.9, pitch: 0.96 },
   you: { rate: 0.87, pitch: 0.94 },
@@ -167,9 +188,11 @@ export class SpeechPlayer {
     this.hasDistinctVoices = false;
     this._pendingTimer = null;
     this._currentUtterance = null;
+    this._currentAudio = null;
+    this._missingAudioUrls = new Set();
     this._audioCtx = null;
 
-    if (this.isSupported()) {
+    if (this._isWebSpeechSupported()) {
       this._refreshVoices();
       const synth = window.speechSynthesis;
       if (typeof synth.addEventListener === 'function') {
@@ -181,10 +204,10 @@ export class SpeechPlayer {
   }
 
   /**
-   * Check whether Web Speech API synthesis is available in the current environment.
+   * Check whether browser Web Speech synthesis is available.
    * @returns {boolean}
    */
-  isSupported() {
+  _isWebSpeechSupported() {
     return (
       typeof window !== 'undefined' &&
       'speechSynthesis' in window &&
@@ -193,10 +216,18 @@ export class SpeechPlayer {
   }
 
   /**
+   * Check whether audio file playback or Web Speech synthesis is available.
+   * @returns {boolean}
+   */
+  isSupported() {
+    return this._isWebSpeechSupported() || typeof Audio !== 'undefined';
+  }
+
+  /**
    * Assign available Japanese voices to character roles.
    */
   _refreshVoices() {
-    if (!this.isSupported()) return;
+    if (!this._isWebSpeechSupported()) return;
     const voices = window.speechSynthesis.getVoices?.() || [];
     if (!voices.length) return;
 
@@ -217,7 +248,7 @@ export class SpeechPlayer {
   }
 
   /**
-   * Immediately cancel any pending timer or active/queued speech synthesis.
+   * Immediately cancel any pending timer, active WAV audio, or queued speech synthesis.
    */
   stop() {
     if (this._pendingTimer !== null) {
@@ -226,7 +257,20 @@ export class SpeechPlayer {
     }
     this._currentUtterance = null;
 
-    if (!this.isSupported()) return;
+    if (this._currentAudio) {
+      const audio = this._currentAudio;
+      this._currentAudio = null;
+      audio.onended = null;
+      audio.onerror = null;
+      try {
+        audio.pause();
+        audio.currentTime = 0;
+      } catch {
+        // Ignore audio element reset errors
+      }
+    }
+
+    if (!this._isWebSpeechSupported()) return;
     const synth = window.speechSynthesis;
     if (synth.speaking || synth.pending) {
       synth.cancel();
@@ -240,7 +284,10 @@ export class SpeechPlayer {
    * @returns {boolean}
    */
   speak(text, { speaker = '' } = {}) {
-    if (!this.isSupported()) return false;
+    if (!this._isWebSpeechSupported()) {
+      this.stop();
+      return false;
+    }
 
     const synth = window.speechSynthesis;
     const wasBusy = Boolean(synth.speaking || synth.pending);
@@ -409,6 +456,99 @@ export class SpeechPlayer {
   }
 
   /**
+   * Play a pre-generated audio file (e.g. AivisSpeech WAV) with optional Web Speech fallback.
+   * @param {string} url
+   * @param {{ fallbackText?: string, fallbackSpeaker?: string, force?: boolean }} [options]
+   * @returns {boolean}
+   */
+  playAudioFile(url, { fallbackText = '', fallbackSpeaker = '', force = false } = {}) {
+    if (!this.enabled && !force) return false;
+    this.stop();
+
+    if (!url || typeof Audio === 'undefined' || this._missingAudioUrls.has(url)) {
+      return fallbackText ? this.speak(fallbackText, { speaker: fallbackSpeaker }) : false;
+    }
+
+    const audio = new Audio(url);
+    audio.preload = 'auto';
+    this._currentAudio = audio;
+
+    const fallbackToSpeech = () => {
+      if (this._currentAudio === audio) {
+        this._currentAudio = null;
+      }
+      this._missingAudioUrls.add(url);
+      if (fallbackText && (this.enabled || force)) {
+        this.speak(fallbackText, { speaker: fallbackSpeaker });
+      }
+    };
+
+    audio.onended = () => {
+      if (this._currentAudio === audio) {
+        this._currentAudio = null;
+      }
+    };
+    audio.onerror = fallbackToSpeech;
+
+    try {
+      const playPromise = audio.play();
+      if (playPromise && typeof playPromise.catch === 'function') {
+        playPromise.catch((err) => {
+          if (err?.name === 'NotAllowedError') {
+            if (this._currentAudio === audio) {
+              this._currentAudio = null;
+            }
+            return;
+          }
+          fallbackToSpeech();
+        });
+      }
+      return true;
+    } catch {
+      fallbackToSpeech();
+      return false;
+    }
+  }
+
+  /**
+   * Resolve pre-generated AivisSpeech WAV URL for a scenario scene if present.
+   * @param {Record<string, string>|null|undefined} scene
+   * @returns {string}
+   */
+  getSceneAudioUrl(scene) {
+    const explicit = (scene?.audio_file || '').trim();
+    if (explicit) return explicit;
+    const sceneId = (scene?.scene_id || '').trim();
+    if (PREGENERATED_SCENE_IDS.has(sceneId)) {
+      return `./public/sounds/${sceneId}.wav`;
+    }
+    return '';
+  }
+
+  /**
+   * Speak a scenario scene using pre-generated WAV if available, or Web Speech fallback.
+   * @param {Record<string, string>|null|undefined} scene
+   * @param {{ force?: boolean }} [options]
+   * @returns {boolean}
+   */
+  speakScene(scene, { force = false } = {}) {
+    if (!scene) return false;
+    if (!this.enabled && !force) return false;
+
+    const text = scene.text || '';
+    const speaker = (scene.speaker || '').trim();
+    const audioUrl = this.getSceneAudioUrl(scene);
+    if (audioUrl) {
+      return this.playAudioFile(audioUrl, {
+        fallbackText: text,
+        fallbackSpeaker: speaker,
+        force,
+      });
+    }
+    return this.speak(text, { speaker });
+  }
+
+  /**
    * Automatically speak the scene text if speech is enabled and text is present.
    * @param {Record<string, string>|null|undefined} scene
    * @returns {boolean}
@@ -418,6 +558,6 @@ export class SpeechPlayer {
       this.stop();
       return false;
     }
-    return this.speak(scene.text, { speaker: (scene.speaker || '').trim() });
+    return this.speakScene(scene, { force: false });
   }
 }

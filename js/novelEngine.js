@@ -3,41 +3,37 @@ import { SpeechPlayer } from './speechPlayer.js';
 
 const PRAISE_PHRASES = [
   {
+    display: 'あっぱれ！',
+    sub: '見事な対応です！',
+    speech: 'あっぱれ！',
+    audio: './public/sounds/appare.wav',
+  },
+  {
     display: 'お見事！',
     sub: 'すばらしい判断です！',
-    speech: 'お見事！すばらしい判断ですね！',
+    speech: 'お見事！',
+    audio: './public/sounds/omigoto.wav',
   },
   {
     display: 'ご名答！',
     sub: 'よく見抜きましたね！',
-    speech: 'ご名答！しっかり見抜きましたね！',
-  },
-  {
-    display: 'あっぱれ！',
-    sub: '見事な対応です！',
-    speech: 'あっぱれ！本当に見事な対応です！',
+    speech: 'ご名答！',
+    audio: './public/sounds/gomeitou.wav',
   },
 ];
 
-const TRAP_PHRASES = [
-  {
-    display: '引っかかったな！',
-    sub: '危ない！詐欺の手口に気をつけましょう',
-    speech: '引っかかったな！一度立ち止まって確認しましょう！',
-  },
-  {
-    display: 'あぶない！',
-    sub: 'そのまま進むと危険な場面です',
-    speech: 'あぶない！危うく詐欺の罠にかかるところでしたよ！',
-  },
-  {
-    display: 'そこが罠じゃ！',
-    sub: 'あわてず立ち止まるのが大切です',
-    speech: 'そこが罠じゃ！あわてずに気をつけましょう！',
-  },
-];
+const TRAP_PHRASE = {
+  display: '甘い！そこが罠じゃ！',
+  sub: 'あわてず立ち止まって確認しましょう！',
+  speech: '甘い！そこが罠じゃ！',
+  audio: './public/sounds/amai.wav',
+};
 
-const SMS_PRAISE_VOICES = ['あっぱれ！', 'お見事！', 'ご名答！'];
+const PERFECT_CLEAR_AUDIO = {
+  audio: './public/sounds/perfect_clear.wav',
+  speech:
+    'あっぱれ！全問正解です！集めたリンゴがキラキラと黄金のリンゴに変化し、免許皆伝の巻物が授与されました！',
+};
 
 /**
  * Check whether an episode uses the Episode 1 apple collection mechanic.
@@ -513,7 +509,6 @@ export class NovelEngine {
     this.speechPlayer = new SpeechPlayer();
     this._effectTimers = [];
     this._lastPraiseIdx = -1;
-    this._lastTrapIdx = -1;
     this._smsPraiseCursor = 0;
   }
 
@@ -965,7 +960,7 @@ export class NovelEngine {
       const replayBtn = el('button', 'btn btn-small btn-speech-replay', '🔁 もういちど聞く');
       replayBtn.type = 'button';
       replayBtn.addEventListener('click', () => {
-        this.speechPlayer.speak(scene.text, { speaker });
+        this.speechPlayer.speakScene(scene, { force: true });
       });
       controls.appendChild(replayBtn);
     }
@@ -983,7 +978,7 @@ export class NovelEngine {
       this.speechPlayer.setEnabled(nextEnabled);
       this.renderCurrentScene({ autoSpeak: false });
       if (nextEnabled && hasText) {
-        this.speechPlayer.speak(scene.text, { speaker });
+        this.speechPlayer.speakScene(scene);
       }
     });
     controls.appendChild(toggleBtn);
@@ -1130,21 +1125,22 @@ export class NovelEngine {
             this.state.latestAppleGain = false;
           }
 
-          const praiseCallout =
-            SMS_PRAISE_VOICES[this._smsPraiseCursor % SMS_PRAISE_VOICES.length];
+          const praiseEntry =
+            PRAISE_PHRASES[this._smsPraiseCursor % PRAISE_PHRASES.length];
           this._smsPraiseCursor += 1;
 
           this.state.activeClueFeedback = {
             text: seg.text,
             explanation: seg.explanation,
             gainedApple,
-            callout: praiseCallout,
+            callout: praiseEntry.display,
           };
           this.renderCurrentScene();
 
-          if (this.speechPlayer.enabled) {
-            this.speechPlayer.speak(praiseCallout, { speaker: '称賛' });
-          }
+          this.speechPlayer.playAudioFile(praiseEntry.audio, {
+            fallbackText: praiseEntry.speech,
+            fallbackSpeaker: '称賛',
+          });
         });
         parent.appendChild(btn);
       }
@@ -1234,7 +1230,7 @@ export class NovelEngine {
     const isCorrect = choice.score > 0;
     const phrase = isCorrect
       ? this._pickPhrase(PRAISE_PHRASES, '_lastPraiseIdx')
-      : this._pickPhrase(TRAP_PHRASES, '_lastTrapIdx');
+      : TRAP_PHRASE;
 
     const appleKey = isCorrect && this.state.isAppleMode ? `choice::${scene.scene_id}` : null;
     const gainedApple = Boolean(appleKey && !this.state.earnedAppleIds.has(appleKey));
@@ -1253,16 +1249,10 @@ export class NovelEngine {
 
     this.renderChoiceCalloutOverlay();
 
-    if (isCorrect) {
-      const speechMsg = gainedApple
-        ? `${phrase.speech} りんごを1つゲットしました！`
-        : phrase.speech;
-      if (this.speechPlayer.enabled) {
-        this.speechPlayer.speak(speechMsg, { speaker: '称賛' });
-      }
-    } else {
-      this.speechPlayer.speakFeedback(phrase.speech, 'trap');
-    }
+    this.speechPlayer.playAudioFile(phrase.audio, {
+      fallbackText: phrase.speech,
+      fallbackSpeaker: isCorrect ? '称賛' : '罠',
+    });
   }
 
   /**
@@ -1443,10 +1433,10 @@ export class NovelEngine {
       void showcase.offsetWidth;
 
       if (playAudio && this.speechPlayer.enabled) {
-        this.speechPlayer.speakFeedback(
-          'あっぱれ！全問正解です！集めたリンゴがキラキラと黄金のリンゴに変化し、免許皆伝の巻物が授与されました！',
-          'fanfare'
-        );
+        this.speechPlayer.playAudioFile(PERFECT_CLEAR_AUDIO.audio, {
+          fallbackText: PERFECT_CLEAR_AUDIO.speech,
+          fallbackSpeaker: '称賛',
+        });
       }
 
       const t1 = setTimeout(() => {
