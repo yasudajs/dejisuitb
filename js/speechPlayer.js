@@ -31,7 +31,7 @@ export function getSpeakerRole(speaker) {
   if (name.includes('称賛') || name.includes('ほめ') || name === 'praise') {
     return 'praise';
   }
-  if (name.includes('罠') || name.includes('警告') || name === 'trap') {
+  if (name.includes('罠') || name.includes('警告') || name.includes('偽警察') || name.includes('詐欺') || name === 'trap') {
     return 'trap';
   }
   if (name.includes('娘') || name.includes('家族')) {
@@ -71,6 +71,24 @@ const PREGENERATED_SCENE_IDS = new Set([
   'ep1_end_best',
   'ep1_end_recover',
   'ep1_end_learn',
+  'ep5_01',
+  'ep5_02',
+  'ep5_03',
+  'ep5_04',
+  'ep5_05',
+  'ep5_06',
+  'ep5_07',
+  'ep5_08',
+  'ep5_09',
+  'ep5_scam_1',
+  'ep5_scam_2',
+  'ep5_scam_choice',
+  'ep5_9110_1',
+  'ep5_9110_2',
+  'ep5_family_1',
+  'ep5_end_best',
+  'ep5_end_recover',
+  'ep5_end_learn',
 ]);
 
 const VOICE_PROFILES_DISTINCT = {

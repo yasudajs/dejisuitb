@@ -35,6 +35,12 @@ const PERFECT_CLEAR_AUDIO = {
     'あっぱれ！全問正解です！集めたリンゴがキラキラと黄金のリンゴに変化し、免許皆伝の巻物が授与されました！',
 };
 
+const PERFECT_CLEAR_AUDIO_EP5 = {
+  audio: './public/sounds/perfect_clear_ep5.wav',
+  speech:
+    'あっぱれ！全問正解です！ニセ警察官の手口を完全に見抜き、黄金のリンゴと免許皆伝の巻物が授与されました！',
+};
+
 /**
  * Check whether an episode uses the Episode 1 apple collection mechanic.
  * @param {Record<string, string>|null|undefined} episode
@@ -896,6 +902,8 @@ export class NovelEngine {
       if (speaker) {
         let speakerClass = 'speaker-badge';
         if (speaker.includes('あなた')) speakerClass += ' speaker-you';
+        else if (speaker.includes('偽警察')) speakerClass += ' speaker-impostor';
+        else if (speaker.includes('警察相談') || speaker.includes('#9110')) speakerClass += ' speaker-police';
         else if (speaker.includes('娘') || speaker.includes('家族')) speakerClass += ' speaker-family';
         else if (speaker.includes('案内')) speakerClass += ' speaker-guide';
         else speakerClass += ' speaker-narration';
@@ -1377,6 +1385,9 @@ export class NovelEngine {
     );
     stagesGrid.appendChild(stage1);
 
+    const isEp5 = String(episode?.episode_id || '').trim() === '5';
+    const clearAudio = isEp5 ? PERFECT_CLEAR_AUDIO_EP5 : PERFECT_CLEAR_AUDIO;
+
     // Stage 2: Scroll of Mastery (免許皆伝の巻物)
     const stage2 = el('div', 'perfect-stage-card scroll-stage');
     stage2.id = 'stage-master-scroll';
@@ -1403,7 +1414,9 @@ export class NovelEngine {
         'scroll-title-ribbon',
         this.state.isAppleMode
           ? '「詐欺見抜き師・壱の巻」'
-          : `「スマホ見守り達人・第${episode.episode_id}巻」`
+          : isEp5
+            ? '「ニセ警官見抜き師・伍の巻」'
+            : `「スマホ見守り達人・第${episode.episode_id}巻」`
       )
     );
     scrollInner.appendChild(
@@ -1433,8 +1446,8 @@ export class NovelEngine {
       void showcase.offsetWidth;
 
       if (playAudio && this.speechPlayer.enabled) {
-        this.speechPlayer.playAudioFile(PERFECT_CLEAR_AUDIO.audio, {
-          fallbackText: PERFECT_CLEAR_AUDIO.speech,
+        this.speechPlayer.playAudioFile(clearAudio.audio, {
+          fallbackText: clearAudio.speech,
           fallbackSpeaker: '称賛',
         });
       }
