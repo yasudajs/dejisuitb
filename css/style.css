@@ -829,6 +829,18 @@ body {
   border: 1px solid var(--blue-border);
 }
 
+.speaker-impostor {
+  background: var(--red-bg);
+  color: var(--red-dark);
+  border: 1px solid var(--red-border);
+}
+
+.speaker-police {
+  background: var(--blue-bg);
+  color: var(--blue-main);
+  border: 1px solid var(--blue-border);
+}
+
 .novel-text {
   margin: 0 0 1.25rem;
   font-size: 1.2rem;
