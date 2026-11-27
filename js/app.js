@@ -2,12 +2,73 @@ import { loadCSV } from './csvParser.js';
 import { NovelEngine } from './novelEngine.js';
 import { KnowledgeDbView } from './knowledgeDb.js';
 
+const PROGRESS_STORAGE_KEY = 'moshimo_episode_achievements_v1';
+
+const ACHIEVEMENT_BADGE_BY_LEVEL = {
+  good: {
+    barClass: 'is-good',
+    pillClass: 'achievement-pill-good',
+    label: '✅ 安全クリア',
+  },
+  caution: {
+    barClass: 'is-caution',
+    pillClass: 'achievement-pill-caution',
+    label: '⚠️ もう一歩（途中回避）',
+  },
+  bad: {
+    barClass: 'is-bad',
+    pillClass: 'achievement-pill-bad',
+    label: '🚨 危険ルート（もう一度挑戦）',
+  },
+  neutral: {
+    barClass: 'is-neutral',
+    pillClass: 'achievement-pill-neutral',
+    label: '📖 体験済み',
+  },
+};
+
 const appState = {
   episodes: [],
   knowledgeRecords: [],
+  achievements: {},
   currentView: 'title',
   viewHistory: [],
 };
+
+function loadAchievements() {
+  try {
+    const raw = window.localStorage.getItem(PROGRESS_STORAGE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveEpisodeAchievement(summary) {
+  const episodeId = String(summary?.episodeId || '').trim();
+  if (!episodeId) return;
+
+  const next = {
+    cleared: Boolean(summary.cleared),
+    bestApples: summary.apples || 0,
+    appleGoal: summary.appleGoal || 0,
+    perfect: Boolean(summary.perfect),
+    bestLevel: summary.resultLevel || 'neutral',
+  };
+
+  appState.achievements[episodeId] = next;
+  try {
+    window.localStorage.setItem(
+      PROGRESS_STORAGE_KEY,
+      JSON.stringify(appState.achievements)
+    );
+  } catch {
+    // Ignore storage quota or private browsing errors
+  }
+  renderEpisodesList();
+}
 
 const elements = {};
 let novelEngine = null;
@@ -22,7 +83,7 @@ function el(tag, className = '', text = '') {
 
 /**
  * Switch active view and record navigation history.
- * @param {'title'|'home'|'episodes'|'novel'|'db'} nextView
+ * @param {'title'|'episodes'|'novel'|'db'} nextView
  * @param {boolean} pushHistory
  */
 function navigateTo(nextView, pushHistory = true) {
@@ -60,10 +121,8 @@ function handleGlobalBack() {
   if (appState.viewHistory.length > 0) {
     const prev = appState.viewHistory.pop();
     navigateTo(prev, false);
-  } else if (appState.currentView === 'home') {
-    navigateTo('title', false);
   } else if (appState.currentView !== 'title') {
-    navigateTo('home', false);
+    navigateTo('title', false);
   }
 }
 
@@ -76,14 +135,17 @@ function renderEpisodesList() {
   container.innerHTML = '';
 
   const intro = el('section', 'card episodes-intro');
-  intro.appendChild(el('h2', 'section-title', 'ストーリー体験（全15話）'));
-  intro.appendChild(
+  const safetyBanner = el('div', 'safety-assurance-banner');
+  safetyBanner.appendChild(
     el(
       'p',
-      'lead-text',
-      'まずは「第1話」から体験できます。第2話以降は、1話ごとに分かれたCSVファイルへ順番にお話を追加できる仕組みになっています。'
+      'safety-assurance-text',
+      '🛡️ ボタンを押し間違えても、この中の操作でスマートフォンが壊れることは絶対にありません。安心してゆっくりお試しください。'
     )
   );
+  intro.appendChild(safetyBanner);
+  intro.appendChild(el('h2', 'section-title', 'ストーリー体験（全15話）'));
+
   container.appendChild(intro);
 
   const seriesGroups = [
@@ -146,78 +208,114 @@ function renderEpisodesList() {
       });
       card.appendChild(btn);
 
+      const ach = appState.achievements[String(ep.episode_id || '').trim()];
+      if (ach && ach.cleared) {
+        if (ach.perfect) {
+          const achBar = el('div', 'episode-achievement-bar is-perfect');
+          achBar.appendChild(
+            el('span', 'achievement-pill achievement-pill-gold', '✨🍎 黄金のリンゴ')
+          );
+          achBar.appendChild(
+            el('span', 'achievement-pill achievement-pill-scroll', '📜 免許皆伝')
+          );
+          card.appendChild(achBar);
+        } else {
+          const levelMeta =
+            ACHIEVEMENT_BADGE_BY_LEVEL[ach.bestLevel] ||
+            ACHIEVEMENT_BADGE_BY_LEVEL.neutral;
+          const achBar = el('div', `episode-achievement-bar ${levelMeta.barClass}`);
+          achBar.appendChild(
+            el('span', `achievement-pill ${levelMeta.pillClass}`, levelMeta.label)
+          );
+          if (ach.bestApples > 0) {
+            const appleIcons = '🍎'.repeat(ach.bestApples);
+            const appleLabel =
+              ach.appleGoal > 0
+                ? `${appleIcons}（${ach.bestApples}/${ach.appleGoal}）`
+                : appleIcons;
+            achBar.appendChild(
+              el('span', 'achievement-pill achievement-pill-apple', appleLabel)
+            );
+          }
+          card.appendChild(achBar);
+        }
+      }
+
       grid.appendChild(card);
     });
 
     section.appendChild(grid);
     container.appendChild(section);
   });
-}
 
-/**
- * Update Home dashboard numbers from loaded CSVs.
- */
-function updateHomeCounters() {
-  const playableCount = appState.episodes.filter((e) => e.status === 'playable').length;
-  const totalEpCount = appState.episodes.length;
-  const dbCount = appState.knowledgeRecords.length;
-
-  if (elements.homeEpCount) {
-    elements.homeEpCount.textContent = `全${totalEpCount}話（第1話 公開中 / 他${Math.max(
-      0,
-      totalEpCount - playableCount
-    )}話 準備中）`;
-  }
-  if (elements.homeDbCount) {
-    elements.homeDbCount.textContent = `4レイヤー・ダミー記録 ${dbCount}件`;
-  }
+  const rulesCard = el('section', 'card home-rule-card');
+  rulesCard.appendChild(el('h3', 'panel-heading', '覚えておきたい「3つの合言葉」'));
+  const rulesGrid = el('div', 'three-rules-grid');
+  const threeRules = [
+    {
+      num: '1',
+      title: '疑う',
+      desc: '「急いで！」「今日中！」と急かされたら一度ストップ',
+    },
+    {
+      num: '2',
+      title: '確かめる',
+      desc: '届いたURLは押さず、公式アプリや裏面の電話番号から確認',
+    },
+    {
+      num: '3',
+      title: '相談する',
+      desc: '迷ったら家族や #9110・188 へ相談（聞けたら大正解！）',
+    },
+  ];
+  threeRules.forEach((rule) => {
+    const chip = el('div', 'rule-chip');
+    chip.appendChild(el('span', 'rule-num', rule.num));
+    const textBox = el('div');
+    textBox.appendChild(el('strong', '', rule.title));
+    textBox.appendChild(el('p', '', rule.desc));
+    chip.appendChild(textBox);
+    rulesGrid.appendChild(chip);
+  });
+  rulesCard.appendChild(rulesGrid);
+  container.appendChild(rulesCard);
 }
 
 async function initApp() {
+  appState.achievements = loadAchievements();
+  elements.headerBrandBtn = document.getElementById('header-brand-btn');
   elements.globalHomeBtn = document.getElementById('global-home-btn');
   elements.globalBackBtn = document.getElementById('global-back-btn');
   elements.episodesContainer = document.getElementById('view-episodes');
   elements.novelContainer = document.getElementById('view-novel');
   elements.dbContainer = document.getElementById('view-db');
-  elements.homeStatus = document.getElementById('home-load-status');
-  elements.homeEpCount = document.getElementById('home-ep-count');
-  elements.homeDbCount = document.getElementById('home-db-count');
+  elements.loadStatus = document.getElementById('app-load-status');
+
+  const goToTitle = () => {
+    appState.viewHistory = [];
+    navigateTo('title', false);
+  };
 
   // Wire persistent header navigation
-  elements.globalHomeBtn.addEventListener('click', () => {
-    appState.viewHistory = ['title'];
-    navigateTo('home', false);
-  });
-  elements.globalBackBtn.addEventListener('click', handleGlobalBack);
+  elements.headerBrandBtn?.addEventListener('click', goToTitle);
+  elements.globalHomeBtn?.addEventListener('click', goToTitle);
+  elements.globalBackBtn?.addEventListener('click', handleGlobalBack);
 
   // Wire title cover screen entry buttons
   const startFromTitle = () => {
-    navigateTo('home', true);
+    navigateTo('episodes', true);
   };
   document.getElementById('btn-title-start')?.addEventListener('click', startFromTitle);
   document.getElementById('btn-title-start-sub')?.addEventListener('click', startFromTitle);
-
-  // Wire home entry buttons
-  document.getElementById('btn-open-episodes').addEventListener('click', () => {
-    navigateTo('episodes');
-  });
-  document.getElementById('btn-open-ep1-direct').addEventListener('click', () => {
-    const ep1 = appState.episodes.find((e) => e.episode_id === '1') || appState.episodes[0];
-    if (ep1) {
-      navigateTo('novel');
-      novelEngine.startEpisode(ep1);
-    } else {
-      navigateTo('episodes');
-    }
-  });
-  document.getElementById('btn-open-db').addEventListener('click', () => {
-    navigateTo('db');
+  document.getElementById('btn-title-db')?.addEventListener('click', () => {
+    navigateTo('db', true);
   });
 
   // Initialize views
   novelEngine = new NovelEngine(elements.novelContainer, {
     onNavigateEpisodes: () => navigateTo('episodes'),
     onNavigateDb: () => navigateTo('db'),
+    onEpisodeComplete: (summary) => saveEpisodeAchievement(summary),
   });
   knowledgeDbView = new KnowledgeDbView(elements.dbContainer);
 
@@ -232,19 +330,18 @@ async function initApp() {
     appState.episodes = episodes;
     appState.knowledgeRecords = knowledgeRecords;
 
-    updateHomeCounters();
     renderEpisodesList();
     knowledgeDbView.setRecords(knowledgeRecords);
 
-    if (elements.homeStatus) {
-      elements.homeStatus.hidden = true;
+    if (elements.loadStatus) {
+      elements.loadStatus.hidden = true;
     }
   } catch (err) {
-    if (elements.homeStatus) {
-      elements.homeStatus.hidden = false;
-      elements.homeStatus.className = 'card info-panel info-panel-amber';
-      elements.homeStatus.innerHTML = '';
-      elements.homeStatus.appendChild(
+    if (elements.loadStatus) {
+      elements.loadStatus.hidden = false;
+      elements.loadStatus.className = 'card info-panel info-panel-amber';
+      elements.loadStatus.innerHTML = '';
+      elements.loadStatus.appendChild(
         el(
           'p',
           'panel-body',

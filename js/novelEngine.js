@@ -345,6 +345,54 @@ export function computeMaxActionScore(scenes) {
 }
 
 /**
+ * Compute the maximum remaining steps from startSceneId to a result scene.
+ * Uses cycle-safe DFS so branching routes always reach 100% on completion.
+ * @param {Map<string, Record<string, string>>} sceneMap
+ * @param {string} startSceneId
+ * @returns {number}
+ */
+export function computeMaxRemainingSteps(sceneMap, startSceneId) {
+  if (!sceneMap || !startSceneId || !sceneMap.has(startSceneId)) return 0;
+
+  function dfs(sceneId, visited) {
+    if (!sceneId || visited.has(sceneId) || !sceneMap.has(sceneId)) {
+      return 0;
+    }
+    const scene = sceneMap.get(sceneId);
+    if (scene.scene_type === 'result') {
+      return 0;
+    }
+
+    const nextVisited = new Set(visited);
+    nextVisited.add(sceneId);
+
+    if (scene.scene_type === 'choice') {
+      let maxRemaining = 0;
+      for (let i = 1; i <= 3; i++) {
+        const nextId = scene[`choice${i}_next`];
+        if (!nextId || nextVisited.has(nextId) || !sceneMap.has(nextId)) continue;
+        const branchSteps = 1 + dfs(nextId, nextVisited);
+        if (branchSteps > maxRemaining) {
+          maxRemaining = branchSteps;
+        }
+      }
+      return maxRemaining;
+    }
+
+    if (
+      scene.next_scene_id &&
+      !nextVisited.has(scene.next_scene_id) &&
+      sceneMap.has(scene.next_scene_id)
+    ) {
+      return 1 + dfs(scene.next_scene_id, nextVisited);
+    }
+    return 0;
+  }
+
+  return dfs(startSceneId, new Set());
+}
+
+/**
  * Evaluate result level ('good' | 'caution' | 'bad' | 'neutral') from actionScore / maxActionScore.
  * @param {number} actionScore
  * @param {number} maxActionScore
@@ -456,7 +504,7 @@ function el(tag, className = '', text = '') {
 export class NovelEngine {
   /**
    * @param {HTMLElement} container
-   * @param {{ onNavigateEpisodes: () => void, onNavigateDb: () => void }} callbacks
+   * @param {{ onNavigateEpisodes: () => void, onNavigateDb: () => void, onEpisodeComplete?: (summary: { episodeId: string, cleared: boolean, apples: number, appleGoal: number, isAppleMode: boolean, perfect: boolean, resultLevel: 'good'|'caution'|'bad'|'neutral' }) => void }} callbacks
    */
   constructor(container, callbacks) {
     this.container = container;
@@ -500,8 +548,21 @@ export class NovelEngine {
    */
   _isPerfectClear() {
     if (!this.state) return false;
-    const { actionScore, maxActionScore, wrongChoiceCount } = this.state;
-    return maxActionScore > 0 && actionScore >= maxActionScore && wrongChoiceCount === 0;
+    const {
+      actionScore,
+      maxActionScore,
+      wrongChoiceCount,
+      isAppleMode,
+      earnedAppleIds,
+      appleGoal,
+      discoveredClues,
+      totalClues,
+    } = this.state;
+    const hasFullActionScore =
+      maxActionScore > 0 && actionScore >= maxActionScore && wrongChoiceCount === 0;
+    const hasAllClues = totalClues <= 0 || discoveredClues.size >= totalClues;
+    const hasAllApples = !isAppleMode || earnedAppleIds.size >= appleGoal;
+    return hasFullActionScore && hasAllClues && hasAllApples;
   }
 
   /**
@@ -753,7 +814,7 @@ export class NovelEngine {
   renderCurrentScene({ autoSpeak = false } = {}) {
     if (!this.state) return;
     this.clearEffectTimers();
-    const { episode, sceneMap, sceneOrder, currentSceneId, scenes } = this.state;
+    const { episode, sceneMap, currentSceneId } = this.state;
     const scene = sceneMap.get(currentSceneId);
     if (!scene) return;
 
@@ -768,12 +829,21 @@ export class NovelEngine {
     titleRow.appendChild(el('h2', 'novel-ep-name', episode.episode_title));
     header.appendChild(titleRow);
 
-    const stepNum = (sceneOrder.get(currentSceneId) ?? 0) + 1;
-    const totalSteps = scenes.length;
-    const pct = Math.min(100, Math.round((stepNum / totalSteps) * 100));
+    const stepNum = this.state.history.length + 1;
+    const remainingSteps =
+      scene.scene_type === 'result'
+        ? 0
+        : computeMaxRemainingSteps(sceneMap, currentSceneId);
+    const totalSteps = stepNum + remainingSteps;
+    const pct =
+      scene.scene_type === 'result'
+        ? 100
+        : Math.min(100, Math.round((stepNum / totalSteps) * 100));
 
+    const progressLabel =
+      scene.scene_type === 'result' ? 'ストーリー完了（100%）' : `すすみ具合 ${pct}%`;
     const progressMeta = el('div', 'progress-meta');
-    progressMeta.appendChild(el('span', 'progress-label', `場面 ${stepNum} / ${totalSteps}`));
+    progressMeta.appendChild(el('span', 'progress-label', progressLabel));
     if (this.state.totalClues > 0) {
       progressMeta.appendChild(
         el(
@@ -1412,6 +1482,15 @@ export class NovelEngine {
     const evalResult = evaluateResultLevel(actionScore, maxActionScore);
     const isPerfectClear = this._isPerfectClear();
     const appleCount = this.state.earnedAppleIds.size;
+    this.callbacks.onEpisodeComplete?.({
+      episodeId: String(episode.episode_id || '').trim(),
+      cleared: true,
+      apples: appleCount,
+      appleGoal: this.state.isAppleMode ? this.state.appleGoal : 0,
+      isAppleMode: Boolean(this.state.isAppleMode),
+      perfect: isPerfectClear,
+      resultLevel: evalResult.level,
+    });
     const card = el('section', `card novel-result-card result-level-${evalResult.level}`);
 
     card.appendChild(el('div', 'result-verdict-badge', evalResult.badge));
@@ -1445,7 +1524,7 @@ export class NovelEngine {
         el(
           'p',
           'apple-result-hint',
-          '全問正解すると、集めたリンゴがキラキラと『黄金のリンゴ』に変化して『免許皆伝の巻物（称号）』が授与されます！ぜひもう一度挑戦してみましょう。'
+          'リンゴを全部集めて全問正解すると、集めたリンゴがキラキラと『黄金のリンゴ』に変化して『免許皆伝の巻物（称号）』が授与されます！ぜひもう一度挑戦してみましょう。'
         )
       );
       card.appendChild(appleBox);

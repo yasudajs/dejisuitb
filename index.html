@@ -10,33 +10,40 @@
   <!-- Persistent Fixed-Position Top Bar (4.1 UI要件: 恒常的な戻る・ホームボタン) -->
   <header class="app-header" role="banner">
     <div class="header-inner">
-      <div class="header-brand">
+      <button
+        id="header-brand-btn"
+        type="button"
+        class="header-brand"
+        aria-label="TOP画面へ戻る"
+      >
         <span class="brand-icon" aria-hidden="true">📱</span>
-        <div class="brand-text">
-          <h1 class="brand-title">スマホのもしも帖</h1>
-          <p class="brand-subtitle">立ち止まる・確かめる・相談する練習帖</p>
-        </div>
-      </div>
+        <span class="brand-text">
+          <span class="brand-title">スマホのもしも帖</span>
+          <span class="brand-subtitle">立ち止まる・確かめる・相談する練習帖</span>
+        </span>
+      </button>
       <nav class="header-nav" aria-label="共通ナビゲーション">
         <button id="global-back-btn" type="button" class="btn btn-nav">
           ← ひとつ戻る
         </button>
         <button id="global-home-btn" type="button" class="btn btn-nav btn-nav-home">
-          🏠 ホーム
+          🏠 TOPへ
         </button>
       </nav>
     </div>
   </header>
 
   <main class="app-main" id="app-main">
-    <!-- View: Title Cover (1ページ目) -->
+    <div id="app-load-status" hidden></div>
+
+    <!-- View: Title Cover (TOP画面) -->
     <section id="view-title" class="app-view title-view" aria-label="タイトル画面">
       <div class="title-stage">
         <button
           id="btn-title-start"
           type="button"
           class="title-cover-btn"
-          aria-label="スマホのもしも帖 詐欺トレ をはじめる（次の画面へ進む）"
+          aria-label="スマホのもしも帖 詐欺トレ をはじめる（ストーリー一覧へ進む）"
         >
           <img
             src="./images/title-cover.jpg"
@@ -56,86 +63,16 @@
           </button>
           <p class="title-tap-hint">※上のイラストをタップしても進めます</p>
         </div>
-      </div>
-    </section>
-
-    <!-- View: Home (2ページ目) -->
-    <section id="view-home" class="app-view" hidden>
-      <div class="card hero-card">
-        <div class="safety-assurance-banner">
-          <p class="safety-assurance-text">
-            🛡️ ボタンを押し間違えても、この中の操作でスマートフォンが壊れることは絶対にありません。安心してゆっくりお試しください。
-          </p>
-        </div>
-        <h2 class="hero-title">こんにちは！「スマホのもしも帖」へようこそ</h2>
-        <p class="lead-text">
-          日常で起きる「ちょっと怪しいスマホの場面」を安全なストーリーで練習したり、地域のみなさんの「つまずきと知恵」を見たりできるプロトタイプアプリです。
-        </p>
-
-        <div id="home-load-status" hidden></div>
-
-        <div class="home-pillar-grid">
-          <!-- Pillar 1 -->
-          <article class="pillar-card pillar-game">
-            <span class="badge badge-playable">柱① 体験ゲーム</span>
-            <h3 class="pillar-title">ストーリーで体験する</h3>
-            <p class="pillar-desc">
-              サウンドノベル形式で物語を読み進めながら、怪しいメッセージを見抜いて「疑う・確かめる・相談する」を楽しく練習します。
-            </p>
-            <p id="home-ep-count" class="pillar-meta">読み込み中…</p>
-            <div class="action-stack">
-              <button id="btn-open-ep1-direct" type="button" class="btn btn-primary btn-large">
-                ▶ まずは第1話を体験する
-              </button>
-              <button id="btn-open-episodes" type="button" class="btn btn-outline btn-large">
-                📖 全15話の一覧を見る
-              </button>
-            </div>
-          </article>
-
-          <!-- Pillar 2 -->
-          <article class="pillar-card pillar-db">
-            <span class="badge layer-life">柱② 三現主義データベース</span>
-            <h3 class="pillar-title">みんなのつまずき・知恵を見る</h3>
-            <p class="pillar-desc">
-              「どこで迷ったか」「どんな声かけが安心につながるか」を、現場の事実（三現主義）にもとづいて整理した知見一覧です。
-            </p>
-            <p id="home-db-count" class="pillar-meta">読み込み中…</p>
-            <div class="action-stack">
-              <button id="btn-open-db" type="button" class="btn btn-secondary btn-large">
-                💬 データベースを開く
-              </button>
-            </div>
-          </article>
+        <div class="title-kb-area">
+          <button
+            id="btn-title-db"
+            type="button"
+            class="btn btn-amber-outline btn-medium title-db-btn"
+          >
+            📚 ナレッジベースを見る（みんなのつまずき・知恵）
+          </button>
         </div>
       </div>
-
-      <section class="card home-rule-card">
-        <h3 class="panel-heading">覚えておきたい「3つの合言葉」</h3>
-        <div class="three-rules-grid">
-          <div class="rule-chip">
-            <span class="rule-num">1</span>
-            <div>
-              <strong>疑う</strong>
-              <p>「急いで！」「今日中！」と急かされたら一度ストップ</p>
-            </div>
-          </div>
-          <div class="rule-chip">
-            <span class="rule-num">2</span>
-            <div>
-              <strong>確かめる</strong>
-              <p>届いたURLは押さず、公式アプリや裏面の電話番号から確認</p>
-            </div>
-          </div>
-          <div class="rule-chip">
-            <span class="rule-num">3</span>
-            <div>
-              <strong>相談する</strong>
-              <p>迷ったら家族や #9110・188 へ相談（聞けたら大正解！）</p>
-            </div>
-          </div>
-        </div>
-      </section>
     </section>
 
     <!-- View: Episodes List -->
